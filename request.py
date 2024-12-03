@@ -19,40 +19,27 @@ flask_app = Flask(__name__)
 handler = SlackRequestHandler(app)
 
 def fetch_client_data(channel_id: str):
-    print(f"Fetching data for slack_id: '{channel_id}'")
-    try:
-        response = supabase.table("clientbase").select(
-            "client_name, client_channel_name, client_channel_link, client_channel_description, client_preferences, client_thumbnail_examples, current_credits"
-        ).eq("slack_id", channel_id).execute()
-        
-        print(f"Supabase raw response: {response.data}, Count: {response.count}")
-        if response.data and len(response.data) > 0:
-            return response.data[0]
-        else:
-            return None
-    except Exception as e:
-        print(f"Error fetching client: {e}")
-        return None
+    response = supabase.table("clientbase").select(
+        "client_name_full, client_name_short, client_channel_name, client_channel_link, client_channel_description, client_preferences, client_thumbnail_examples, current_credits"
+    ).eq("slack_id", channel_id).execute()
+    return response.data[0] if response.data else None
 
 @app.command("/request")
 def handle_request(ack, command):
     ack()
     description = command["text"]
     channel_id = command["channel_id"]
-    print(f"Channel ID being used: '{channel_id}'")
     client_info = fetch_client_data(channel_id)
     
     if client_info:
         app.client.chat_postMessage(
             channel=channel_id,
             text=(
-                f"*Thank you, your thumbnail request has been received!* "
-                f"Here's the video description you provided: '{description}'\n\n"
+                f"*Thank you {client_info.get('client_name_short', ' ')}, your thumbnail request has been received!*\n\n"
+                f"*Here's the video description you provided:* '{description}'\n\n"
                 f"––––––––––––––––––––––––––––––––––––––––\n\n"
                 f"You have *{client_info.get('current_credits', 'N/A')}/10* credits left. "
-                f"Have any questions? Please message *'/help'* to see the answers to the FAQ, "
-                f"or *'@Bot'* to tag our AI customer support assistant!\n\n"
-                f"*BUT DO NOT CONTACT THE MANAGER GODDAMNIT*"
+                f"Have any questions? Please message *'/help'* to see the FAQ or *'@Bot'* for support!"
             )
         )
     else:
