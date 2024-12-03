@@ -87,9 +87,7 @@ def handle_request(ack, command):
 
 - **Client information**
 **Client:** {client_info.get('client_name_full', 'Unknown')} 
-**Client’s channel:**
-    {client_info.get('client_channel_name', 'Unknown')}
-    {client_info.get('client_channel_link', 'Unknown')}
+**Client’s channel:** {client_info.get('client_channel_name', 'Unknown')} ({client_info.get('client_channel_link', 'Unknown')})
 
 - **Style**
 **Client’s preferences:** {client_info.get('client_preferences', 'Unknown')}
