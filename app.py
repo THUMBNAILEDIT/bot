@@ -19,9 +19,7 @@ flask_app = Flask(__name__)
 handler = SlackRequestHandler(app)
 
 def fetch_client_data(channel_id: str):
-    response = supabase.table("clientbase").select(
-        "client_name_full, client_name_short, client_channel_name, client_channel_link, client_channel_description, client_preferences, client_thumbnail_examples, current_credits"
-    ).eq("slack_id", channel_id).execute()
+    response = supabase.table("clientbase").select("*").eq("slack_id", channel_id).execute()
     return response.data[0] if response.data else None
 
 @app.command("/request")
@@ -35,17 +33,41 @@ def handle_request(ack, command):
         app.client.chat_postMessage(
             channel=channel_id,
             text=(
-                f"*Thank you {client_info.get('client_name_short', ' ')}, your thumbnail request has been received!*\n\n"
-                f"*Here's the video description you provided:* '{description}'\n\n"
-                f"––––––––––––––––––––––––––––––––––––––––\n\n"
-                f"You have *{client_info.get('current_credits', 'N/A')}/10* credits left. "
+                f"Thank you {client_info.get('client_name_short', ' ')}, your thumbnail request has been received! "
+                f"Here's the video description you provided: '{description}'\n\n"
                 f"Have any questions? Please message *'/help'* to see the FAQ or *'@Bot'* for support!"
+            )
+        )
+
+        new_credits = client_info.get('current_credits', 0) - 1
+        
+        supabase.table("clientbase").update({"current_credits": new_credits}).eq("slack_id", channel_id).execute()
+
+    else:
+        app.client.chat_postMessage(
+            channel=channel_id,
+            text="*Error:* We couldn't find your client info. Please ensure your Slack channel is registered."
+        )
+
+@app.command("/balance")
+def handle_balance(ack, command):
+    ack()
+    channel_id = command["channel_id"]
+    client_info = fetch_client_data(channel_id)
+    
+    if client_info:
+        app.client.chat_postMessage(
+            channel=channel_id,
+            text=(
+                f"Hi {client_info.get('client_name_short', ' ')}! "
+                f"You currently have *{client_info.get('current_credits', 'N/A')}/10* credits left. "
+                f"Running a little low? Visit *<https://www.paddle.com\u200B|our Paddle page>* to refill the tank!"
             )
         )
     else:
         app.client.chat_postMessage(
             channel=channel_id,
-            text="*Error:* We couldn't find your client info. Please ensure your Slack channel is registered."
+            text="*Error:* We couldn't find your client info. Please ensure your Slack channel is registered.\n\n"
         )
 
 @flask_app.route("/slack/events", methods=["POST"])
