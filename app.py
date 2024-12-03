@@ -29,25 +29,35 @@ def handle_request(ack, command):
     channel_id = command["channel_id"]
     client_info = fetch_client_data(channel_id)
     
-    if client_info:
-        app.client.chat_postMessage(
-            channel=channel_id,
-            text=(
-                f"Thank you {client_info.get('client_name_short', ' ')}, your thumbnail request has been received! "
-                f"Here's the video description you provided: '{description}'\n\n"
-                f"Have any questions? Please message *'/help'* to see the FAQ or *'@Bot'* for support!"
-            )
-        )
-
-        new_credits = client_info.get('current_credits', 0) - 1
-        
-        supabase.table("clientbase").update({"current_credits": new_credits}).eq("slack_id", channel_id).execute()
-
-    else:
+    if not client_info:
         app.client.chat_postMessage(
             channel=channel_id,
             text="*Error:* We couldn't find your client info. Please ensure your Slack channel is registered."
         )
+        return
+
+    if client_info.get('current_credits', 0) <= 0:
+        app.client.chat_postMessage(
+            channel=channel_id,
+            text=(
+                f"Sorry {client_info.get('client_name_short', ' ')}, you don't have enough credits to make a request. "
+                f"Please visit *<https://www.paddle.com\u200B|our Paddle page>* to refill your credits and then try again."
+            )
+        )
+        return
+    
+    app.client.chat_postMessage(
+        channel=channel_id,
+        text=(
+            f"Thank you {client_info.get('client_name_short', ' ')}, your thumbnail request has been received! "
+            f"Here's the video description you provided: '{description}'\n\n"
+            f"Have any questions? Please message *'/help'* to see the FAQ or *'@Bot'* for support!"
+        )
+    )
+
+    new_credits = client_info.get('current_credits', 0) - 1
+    
+    supabase.table("clientbase").update({"current_credits": new_credits}).eq("slack_id", channel_id).execute()
 
 @app.command("/balance")
 def handle_balance(ack, command):
