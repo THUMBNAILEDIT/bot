@@ -2,4 +2,4 @@ slack-bolt
 python-dotenv
 flask
 supabase
-requests
+requests 
