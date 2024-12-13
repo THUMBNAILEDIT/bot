@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify
 from supabase import create_client, Client
 import requests
 from slack_sdk.errors import SlackApiError
+import json
 
 load_dotenv(find_dotenv())
 
@@ -15,6 +16,7 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 ASANA_ACCESS_TOKEN = os.getenv("ASANA_ACCESS_TOKEN")
 ASANA_PROJECT_ID = os.getenv("ASANA_PROJECT_ID")
+ASANA_ARCHIVE_PROJECT_ID = os.getenv("ASANA_ARCHIVE_PROJECT_ID")
 
 app = App(token=SLACK_BOT_TOKEN, signing_secret=SLACK_SIGNING_SECRET)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -27,7 +29,7 @@ def fetch_client_data(channel_id: str):
     return response.data[0] if response.data else None
 
 def register_webhook_for_task(task_id):
-    webhook_url = "https://5b7f-46-211-78-104.ngrok-free.app/asana-webhook"
+    webhook_url = "https://ba94-46-211-219-28.ngrok-free.app/asana-webhook"
     url = "https://app.asana.com/api/1.0/webhooks"
     headers = {
         "Authorization": f"Bearer {ASANA_ACCESS_TOKEN}",
@@ -60,12 +62,51 @@ def create_asana_task(task_name, task_notes, channel_id):
         if task_id:
             supabase.table("clientbase").update({"current_task": task_id}).eq("slack_id", channel_id).execute()
             register_webhook_for_task(task_id)
+            
             return task_id
         else:
             print("Task ID not found in response.")
     else:
         print(f"Failed to create task: {response.text}")
     return None
+
+def move_task_to_archive(task_id):    
+    if not ASANA_ARCHIVE_PROJECT_ID:
+        print("Error: Archive project ID is missing.")
+        return
+        
+    url = f"https://app.asana.com/api/1.0/tasks/{task_id}/projects"
+    headers = {
+        "Authorization": f"Bearer {ASANA_ACCESS_TOKEN}"
+    }
+    
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code == 200:
+        current_projects = response.json().get("data", [])
+        
+        for project in current_projects:
+            if project["gid"] != ASANA_ARCHIVE_PROJECT_ID:
+                remove_url = f"https://app.asana.com/api/1.0/tasks/{task_id}/removeProject"
+                data = {
+                    "data": {
+                        "project": project["gid"]
+                    }
+                }
+                requests.post(remove_url, headers=headers, json=data)
+
+        add_url = f"https://app.asana.com/api/1.0/tasks/{task_id}/addProject"
+        data = {
+            "data": {
+                "project": ASANA_ARCHIVE_PROJECT_ID
+            }
+        }
+        add_response = requests.post(add_url, headers=headers, json=data)
+        
+        if add_response.status_code != 200:
+            print(f"Failed to move task {task_id} to archive: {add_response.text}")
+        elif response.status_code != 200:
+            print(f"Failed to fetch current projects for task {task_id}: {response.text}")
 
 @app.command("/request")
 def handle_request(ack, command):
@@ -176,7 +217,37 @@ def asana_webhook():
                             try:
                                 app.client.chat_postMessage(
                                     channel=channel_id,
-                                    text = f"Hi {client_info.get('client_name_short', 'there')}, here's the thumbnail we made for you!\n\n{comment_text}"
+                                    text=f"Hi {client_info.get('client_name_short', 'there')}, here's the thumbnail we made for you!\n\n{comment_text}",
+                                    blocks=[
+                                        {
+                                            "type": "section",
+                                            "text": {
+                                                "type": "mrkdwn",
+                                                "text": f"Hi {client_info.get('client_name_short', 'there')}, here's the thumbnail we made for you!\n\n{comment_text}"
+                                            }
+                                        },
+                                        {
+                                            "type": "actions",
+                                            "elements": [
+                                                {
+                                                    "type": "button",
+                                                    "text": {
+                                                        "type": "plain_text",
+                                                        "text": "Accept"
+                                                    },
+                                                    "action_id": "accept_work"
+                                                },
+                                                {
+                                                    "type": "button",
+                                                    "text": {
+                                                        "type": "plain_text",
+                                                        "text": "Request Revisions"
+                                                    },
+                                                    "action_id": "request_revisions"
+                                                }
+                                            ]
+                                        }
+                                    ]
                                 )
                             except SlackApiError as e:
                                 print(f"Error posting message to Slack: {e.response['error']}")
@@ -194,6 +265,61 @@ def asana_webhook():
 def fetch_client_data_by_task_id(task_id):
     response = supabase.table("clientbase").select("*").eq("current_task", task_id).execute()
     return response.data[0] if response.data else None
+
+@flask_app.route("/slack-actions", methods=["POST"])
+def slack_actions():
+    payload = request.form["payload"]
+    data = json.loads(payload)
+        
+    action = data.get("actions")[0]
+    user_id = data["user"]["id"]
+    response_url = data["response_url"]
+    channel_id = data.get("channel", {}).get("id")
+
+    if action["action_id"] == "accept_work":
+        
+        client_info = fetch_client_data(channel_id)
+        
+        if client_info:
+            task_id = client_info.get('current_task')
+            
+            if task_id:
+                move_task_to_archive(task_id)
+            else:
+                print("Could not find task ID to archive")
+        else:
+            print("Could not find client info")
+
+        requests.post(response_url, json={
+            "replace_original": True,
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "Hi, here's the thumbnail we made for you!\n\nThe task is approved and archived!"
+                    }
+                }
+            ]
+        })
+        return jsonify({"status": "success"}), 200
+
+    elif action["action_id"] == "request_revisions":
+        requests.post(response_url, json={
+            "replace_original": True,
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "Hi, here's the thumbnail we made for you!\n\nPlease provide revision details below."
+                    }
+                }
+            ]
+        })
+        return jsonify({"status": "success"}), 200
+
+    return jsonify({"status": "failure"}), 400
 
 @flask_app.route("/slack/events", methods=["POST"])
 def slack_events():
