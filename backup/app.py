@@ -12,6 +12,7 @@ load_dotenv(find_dotenv())
 
 SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
 SLACK_SIGNING_SECRET = os.environ["SLACK_SIGNING_SECRET"]
+SLACK_API_URL = os.getenv("SLACK_API_URL")
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 ASANA_ACCESS_TOKEN = os.getenv("ASANA_ACCESS_TOKEN")
@@ -270,19 +271,22 @@ def fetch_client_data_by_task_id(task_id):
 def slack_actions():
     payload = request.form["payload"]
     data = json.loads(payload)
-        
+
     action = data.get("actions")[0]
     user_id = data["user"]["id"]
     response_url = data["response_url"]
     channel_id = data.get("channel", {}).get("id")
+    message_ts = data.get("message", {}).get("ts")
+
+    print(f"Payload received: {payload}")
+    print(f"Message Timestamp (message_ts): {message_ts}")
 
     if action["action_id"] == "accept_work":
-        
         client_info = fetch_client_data(channel_id)
-        
+
         if client_info:
             task_id = client_info.get('current_task')
-            
+
             if task_id:
                 move_task_to_archive(task_id)
             else:
@@ -305,6 +309,20 @@ def slack_actions():
         return jsonify({"status": "success"}), 200
 
     elif action["action_id"] == "request_revisions":
+        if channel_id and message_ts:
+            response = requests.post(
+                SLACK_API_URL + "/chat.postMessage",
+                headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
+                json={
+                    "channel": channel_id,
+                    "text": "You can now provide your revision details by replying in this thread.",
+                    "thread_ts": message_ts,
+                },
+            )
+            print(f"Slack API response for thread creation: {response.status_code} - {response.text}")
+        else:
+            print("Failed to get channel or message timestamp for thread creation.")
+
         requests.post(response_url, json={
             "replace_original": True,
             "blocks": [
