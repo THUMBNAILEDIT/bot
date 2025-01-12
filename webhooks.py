@@ -121,22 +121,24 @@ def slack_actions():
         client_info = fetch_client_data(channel_id)
         if client_info:
             task_id = client_info.get("current_task")
-
             if task_id:
+                # Use the thread_ts of the father message
+                thread_ts = message_ts  # The father message's ts is passed as thread_ts here
+                
+                # Post a message in the thread
                 thread_message = requests.post(
                     f"{SLACK_API_URL}/chat.postMessage",
                     headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
                     json={
                         "channel": channel_id,
                         "text": "Please provide your revisions below.",
-                        "thread_ts": message_ts,
+                        "thread_ts": thread_ts,  # Ensure this points to the father message
                     },
                 )
                 if thread_message.status_code == 200:
-                    thread_ts = thread_message.json().get("ts")
-
-                    update_client_thread_mapping(channel_id, task_id, thread_ts)
-
+                    print("Saving mapping:", thread_ts, "->", task_id)  # Debug log
+                    update_client_thread_mapping(channel_id, thread_ts, task_id)  # Save the correct mapping
+                    # Respond to Slack action
                     requests.post(
                         response_url,
                         json={
@@ -144,11 +146,10 @@ def slack_actions():
                             "text": "Your revision request has been noted. Please provide details in the thread."
                         }
                     )
-
                     return jsonify({"status": "success"})
-
                 else:
-                    print(f"Failed to create thread: {thread_message.text}")
+                    print("Failed to post message in thread:", thread_message.text)
+                    return jsonify({"status": "failure", "error": "Failed to post message in thread"}), 500
             else:
                 print("No current task found for this client.")
         else:
@@ -156,12 +157,11 @@ def slack_actions():
 
     return jsonify({"status": "failure", "message": "Action not handled properly"}), 400
 
-
 @app.event("message")
 def handle_thread_messages(event, say):
     print("Received message event:", event)
 
-    if "thread_ts" in event:
+    if "thread_ts" in event:  # Ensure we're processing thread messages
         thread_ts = event["thread_ts"]
         channel_id = event["channel"]
         user_message = event.get("text", "")
@@ -169,7 +169,11 @@ def handle_thread_messages(event, say):
         client_info = fetch_client_data(channel_id)
         if client_info:
             thread_mappings = client_info.get("thread_mappings", {})
-            task_id = next((k for k, v in thread_mappings.items() if v == thread_ts), None)
+            print("Thread mappings in database:", thread_mappings)
+            print("Thread TS in event:", thread_ts)
+            print("Available thread_ts in mappings:", list(thread_mappings.keys()))
+
+            task_id = thread_mappings.get(thread_ts)
 
             if task_id:
                 headers = {
@@ -184,3 +188,7 @@ def handle_thread_messages(event, say):
                     say(text="Your revision has been sent to the designer!", thread_ts=thread_ts)
                 else:
                     say(text="Failed to send your revision. Please try again.", thread_ts=thread_ts)
+            else:
+                say(text="Could not find a corresponding Asana task for this thread.", thread_ts=thread_ts)
+        else:
+            say(text="Could not find client information.", thread_ts=thread_ts)

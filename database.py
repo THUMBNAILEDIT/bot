@@ -17,10 +17,9 @@ def update_client_credits(channel_id: str, new_credits: int):
 def update_client_current_task(channel_id: str, task_id: str):
     supabase.table("clientbase").update({"current_task": task_id}).eq("slack_id", channel_id).execute()
 
-def update_client_thread_mapping(channel_id: str, task_id: str, thread_ts: str):
+def update_client_thread_mapping(channel_id: str, thread_ts: str, task_id: str):
     client = fetch_client_data(channel_id)
     if client:
         current_mappings = client.get("thread_mappings", {}) or {}
-        current_mappings[task_id] = thread_ts
-
+        current_mappings[thread_ts] = task_id  # Ensure correct format moving forward
         supabase.table("clientbase").update({"thread_mappings": current_mappings}).eq("slack_id", channel_id).execute()

@@ -2,7 +2,7 @@ import requests
 from config import ASANA_ACCESS_TOKEN, ASANA_PROJECT_ID, ASANA_ARCHIVE_PROJECT_ID
 
 def register_webhook_for_task(task_id):
-    webhook_url = "https://5654-80-91-172-107.ngrok-free.app/asana-webhook"
+    webhook_url = "https://ae8b-2a02-2378-133e-5b5e-850c-b880-3002-b838.ngrok-free.app/asana-webhook"
     url = "https://app.asana.com/api/1.0/webhooks"
     headers = {
         "Authorization": f"Bearer {ASANA_ACCESS_TOKEN}",
