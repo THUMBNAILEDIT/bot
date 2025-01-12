@@ -11,14 +11,12 @@ handler = SlackRequestHandler(app)
 def slack_events():
     if request.content_type == "application/json":
         data = request.json
-        print("Received Event:", data)
         
         if data.get("type") == "url_verification":
             return jsonify({"challenge": data.get("challenge")})
         
         if data.get("type") == "event_callback":
             event = data.get("event", {})
-            print("Event Data:", event)
             return handler.handle(request)
 
     return jsonify({"error": "Unsupported Media Type"}), 415

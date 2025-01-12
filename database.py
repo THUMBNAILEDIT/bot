@@ -21,5 +21,5 @@ def update_client_thread_mapping(channel_id: str, thread_ts: str, task_id: str):
     client = fetch_client_data(channel_id)
     if client:
         current_mappings = client.get("thread_mappings", {}) or {}
-        current_mappings[thread_ts] = task_id  # Ensure correct format moving forward
+        current_mappings[thread_ts] = task_id
         supabase.table("clientbase").update({"thread_mappings": current_mappings}).eq("slack_id", channel_id).execute()
