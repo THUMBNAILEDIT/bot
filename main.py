@@ -1,4 +1,3 @@
-import json
 from flask import Flask, request, jsonify
 from webhooks import handler, asana_webhook, slack_actions
 from commands import app

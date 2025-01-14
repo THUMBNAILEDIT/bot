@@ -6,6 +6,7 @@ load_dotenv(find_dotenv())
 SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
 SLACK_SIGNING_SECRET = os.environ["SLACK_SIGNING_SECRET"]
 SLACK_API_URL = os.getenv("SLACK_API_URL")
+SLACK_BOT_USER_ID = os.getenv("SLACK_BOT_USER_ID")
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 ASANA_ACCESS_TOKEN = os.getenv("ASANA_ACCESS_TOKEN")
