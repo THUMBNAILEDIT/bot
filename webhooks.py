@@ -3,7 +3,6 @@ import json
 import requests
 from flask import request, jsonify
 from slack_bolt.adapter.flask import SlackRequestHandler
-from slack_sdk.errors import SlackApiError
 
 from config import SLACK_BOT_TOKEN, SLACK_API_URL, ASANA_ADMIN_ID
 from database import (
@@ -18,6 +17,8 @@ from asana_utils import move_task_to_archive
 from commands import app
 
 handler = SlackRequestHandler(app)
+
+GREETING_MESSAGE = "Hi {name}, the deliverables for your video are ready. Please review them and choose whether you are satisfied, or if you'd like to request changes."
 
 def asana_webhook():
     if "X-Hook-Secret" in request.headers:
@@ -52,14 +53,16 @@ def asana_webhook():
                 thread_mappings = client_info.get("thread_mappings") or {}
                 thread_ts = next((k for k, v in thread_mappings.items() if v == task_id), None)
 
+                greeting = GREETING_MESSAGE.format(name=client_info.get("client_name_short", "there"))
+
                 if not thread_ts:
                     response = app.client.chat_postMessage(
                         channel=client_info["slack_id"],
-                        text=f"*Hi {client_info.get('client_name_short', 'there')}, the deliverables for your video are ready. Please review them and choose whether you are satisfied, or if you'd like to request changes.* \n\n{comment_text}",
+                        text=f"*{greeting}* \n\n{comment_text}",
                         blocks=[
                             {
                                 "type": "section",
-                                "text": {"type": "mrkdwn", "text": f"*Hi {client_info.get('client_name_short', 'there')}, the deliverables for your video are ready. Please review them and choose whether you are satisfied, or if you'd like to request changes.* \n\n{comment_text}"},
+                                "text": {"type": "mrkdwn", "text": f"*{greeting}* \n\n{comment_text}"},
                             },
                             {
                                 "type": "actions",
@@ -108,7 +111,7 @@ def slack_actions():
     action = data.get("actions")[0]
     channel_id = data["channel"]["id"]
     response_url = data["response_url"]
-    message_ts = data.get("message", {}).get("ts")
+    message_ts = data["message"]["ts"]
 
     if action["action_id"] == "accept_work":
         client_info = fetch_client_data(channel_id)
@@ -120,7 +123,30 @@ def slack_actions():
 
                 remove_thread_mappings_for_task(channel_id, task_id)
                 remove_task_from_current_tasks(channel_id, task_id)
-                update_task_history(channel_id, task_id)  # Add to task_history
+                update_task_history(channel_id, task_id)
+
+                try:
+                    original_message = app.client.conversations_replies(
+                        channel=channel_id,
+                        ts=message_ts
+                    )
+                    if original_message["ok"] and original_message["messages"]:
+                        full_message = original_message["messages"][0].get("text", "")
+                        greeting = GREETING_MESSAGE.format(name=client_info.get("client_name_short", "there"))
+                        designer_message = full_message.replace(f"*{greeting}*", "").strip()
+                    else:
+                        designer_message = ""
+
+                    app.client.chat_postMessage(
+                        channel=channel_id,
+                        text=(
+                            f"*This request has been approved. Thank you!* \n\n"
+                            f"*Here’s the last message from the designer:* \n{designer_message}"
+                        )
+                    )
+
+                except Exception as e:
+                    print(f"Error while handling approval: {e}")
 
                 requests.post(
                     response_url,
@@ -149,12 +175,31 @@ def slack_actions():
                 print(f"Requesting revisions for Task ID: {task_id}, Thread TS: {thread_ts}")
 
                 try:
+                    original_message = app.client.conversations_replies(
+                        channel=channel_id,
+                        ts=thread_ts
+                    )
+                    if original_message["ok"] and original_message["messages"]:
+                        full_message = original_message["messages"][0].get("text", "")
+                        greeting = GREETING_MESSAGE.format(name=client_info.get("client_name_short", "there"))
+                        designer_message = full_message.replace(f"*{greeting}*", "").strip()
+                    else:
+                        designer_message = ""
+
+                    updated_text = (
+                        f"{designer_message}"
+                    )
+                    app.client.chat_update(
+                        channel=channel_id,
+                        ts=message_ts,
+                        text=updated_text
+                    )
                     thread_message = requests.post(
                         f"{SLACK_API_URL}/chat.postMessage",
                         headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
                         json={
                             "channel": channel_id,
-                            "text": "*Please provide your revisions below.*",
+                            "text": "Please provide your revisions below.",
                             "thread_ts": thread_ts,
                         },
                     )
@@ -168,7 +213,7 @@ def slack_actions():
                             response_url,
                             json={
                                 "replace_original": True,
-                                "text": "*Your revision request has been noted. Please provide details in the thread.*"
+                                "text": updated_text
                             }
                         )
                         return jsonify({"status": "success"})
@@ -221,7 +266,7 @@ def handle_thread_messages(event, say):
                 print(f"Asana API Response: {response.status_code} - {response.text}")
 
                 if response.status_code == 201:
-                    say(text="*Your revision has been received!*", thread_ts=thread_ts)
+                    say(text="Your revisions have been received!", thread_ts=thread_ts)
                 else:
                     say(text="Failed to send your revision. Please try again.", thread_ts=thread_ts)
             else:
