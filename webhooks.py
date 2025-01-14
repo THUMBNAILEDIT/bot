@@ -184,6 +184,45 @@ def slack_actions():
 
         return jsonify({"status": "failure", "message": "Action not handled properly"}), 400
 
+# @app.event("message")
+# def handle_thread_messages(event, say):
+#     print(f"Received message event: {event}")
+
+#     if "thread_ts" in event:
+#         thread_ts = event["thread_ts"]
+#         channel_id = event["channel"]
+#         user_message = event.get("text", "")
+
+#         print(f"Thread TS: {thread_ts}, Channel ID: {channel_id}, Message: {user_message}")
+
+#         client_info = fetch_client_data(channel_id)
+#         if client_info:
+#             thread_mappings = client_info.get("thread_mappings", {})
+#             print(f"Thread Mappings in Database: {thread_mappings}")
+
+#             task_id = thread_mappings.get(thread_ts)
+#             print(f"Resolved Task ID: {task_id}")
+
+#             if task_id:
+#                 headers = {
+#                     "Authorization": f"Bearer {os.getenv('ASANA_ACCESS_TOKEN')}",
+#                     "Content-Type": "application/json"
+#                 }
+#                 comment_url = f"https://app.asana.com/api/1.0/tasks/{task_id}/stories"
+#                 data = {"data": {"text": user_message}}
+#                 response = requests.post(comment_url, headers=headers, json=data)
+
+#                 print(f"Asana API Response: {response.status_code} - {response.text}")
+
+#                 if response.status_code == 201:
+#                     say(text="*Your revision has been received!*", thread_ts=thread_ts)
+#                 else:
+#                     say(text="Failed to send your revision. Please try again.", thread_ts=thread_ts)
+#             else:
+#                 say(text="Could not find a corresponding Asana task for this thread.", thread_ts=thread_ts)
+#         else:
+#             say(text="Could not find client information.", thread_ts=thread_ts)
+
 @app.event("message")
 def handle_thread_messages(event, say):
     print(f"Received message event: {event}")
@@ -202,6 +241,11 @@ def handle_thread_messages(event, say):
 
             task_id = thread_mappings.get(thread_ts)
             print(f"Resolved Task ID: {task_id}")
+
+            current_tasks = client_info.get("current_tasks", "").split(",")
+            if task_id not in current_tasks:
+                print(f"Task ID {task_id} is not active. Ignoring message in thread {thread_ts}.")
+                return
 
             if task_id:
                 headers = {
