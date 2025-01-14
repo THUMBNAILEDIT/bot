@@ -27,8 +27,8 @@ def handle_request(ack, command):
         app.client.chat_postMessage(
             channel=channel_id,
             text=(
-                f"*Unfortunately, you don't have enough credits to make a request.* "
-                f"*Please click <https://www.paddle.com\u200B|here> to refill your credits.*"
+                f"Unfortunately, you don't have enough credits to make a request. "
+                f"Please click *<https://www.paddle.com\u200B|here>* to refill your credits."
             )
         )
         return
@@ -36,8 +36,8 @@ def handle_request(ack, command):
     app.client.chat_postMessage(
         channel=channel_id,
         text=(
-            f"*Your request has been received!* "
-            f"*Here's the link to the video you provided: '{description}'*"
+            f"Your request has been received! "
+            f"Here's the link to the video you provided: *{description}*"
         )
     )
 
@@ -78,9 +78,9 @@ def handle_balance(ack, command):
         app.client.chat_postMessage(
             channel=channel_id,
             text=(
-                f"*Hi {client_info.get('client_name_short', ' ')}!* "
-                f"*You currently have {client_info.get('current_credits', 'N/A')} credits left.* "
-                f"*Running a little low? Click <https://www.paddle.com\u200B|here> to refill the tank!*"
+                f"Hi {client_info.get('client_name_short', ' ')}! "
+                f"You currently have *{client_info.get('current_credits', 'N/A')}* credits left. "
+                f"Running a little low? Click *<https://www.paddle.com\u200B|here>* to refill the tank!*"
             )
         )
     else:

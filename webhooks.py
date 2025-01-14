@@ -74,7 +74,7 @@ def asana_webhook():
                         ],
                     )
                     thread_ts = response["ts"]
-                    print(f"Created new thread: {thread_ts}")
+                    # print(f"Created new thread: {thread_ts}")
 
                     update_client_thread_mapping(client_info["slack_id"], thread_ts, task_id)
 
@@ -118,7 +118,7 @@ def slack_actions():
         if client_info:
             task_id = client_info.get("current_tasks", "").split(",")[0]
             if task_id:
-                print(f"Archiving Task ID: {task_id}")
+                # print(f"Archiving Task ID: {task_id}")
                 move_task_to_archive(task_id)
 
                 remove_thread_mappings_for_task(channel_id, task_id)
@@ -139,10 +139,8 @@ def slack_actions():
 
                     app.client.chat_postMessage(
                         channel=channel_id,
-                        text=(
-                            f"*This request has been approved. Thank you!* \n\n"
-                            f"*Here’s the last message from the designer:* \n{designer_message}"
-                        )
+                        text="This request has been approved. Thank you!",
+                        thread_ts=message_ts
                     )
 
                 except Exception as e:
@@ -152,7 +150,7 @@ def slack_actions():
                     response_url,
                     json={
                         "replace_original": True,
-                        "text": "*This request has been approved. Thank you!*"
+                        "text": f"{designer_message}"
                     }
                 )
             else:
@@ -172,7 +170,7 @@ def slack_actions():
                 task_id = current_tasks[0] if current_tasks else None
 
             if task_id:
-                print(f"Requesting revisions for Task ID: {task_id}, Thread TS: {thread_ts}")
+                # print(f"Requesting revisions for Task ID: {task_id}, Thread TS: {thread_ts}")
 
                 try:
                     original_message = app.client.conversations_replies(
@@ -203,11 +201,11 @@ def slack_actions():
                             "thread_ts": thread_ts,
                         },
                     )
-                    print(f"Slack API Response: {thread_message.status_code} - {thread_message.text}")
+                    # print(f"Slack API Response: {thread_message.status_code} - {thread_message.text}")
 
                     if thread_message.status_code == 200:
                         update_client_thread_mapping(channel_id, thread_ts, task_id)
-                        print(f"Updated thread mappings with Thread TS: {thread_ts}, Task ID: {task_id}")
+                        # print(f"Updated thread mappings with Thread TS: {thread_ts}, Task ID: {task_id}")
 
                         requests.post(
                             response_url,
@@ -232,26 +230,26 @@ def slack_actions():
 
 @app.event("message")
 def handle_thread_messages(event, say):
-    print(f"Received message event: {event}")
+    # print(f"Received message event: {event}")
 
     if "thread_ts" in event:
         thread_ts = event["thread_ts"]
         channel_id = event["channel"]
         user_message = event.get("text", "")
 
-        print(f"Thread TS: {thread_ts}, Channel ID: {channel_id}, Message: {user_message}")
+        # print(f"Thread TS: {thread_ts}, Channel ID: {channel_id}, Message: {user_message}")
 
         client_info = fetch_client_data(channel_id)
         if client_info:
             thread_mappings = client_info.get("thread_mappings", {})
-            print(f"Thread Mappings in Database: {thread_mappings}")
+            # print(f"Thread Mappings in Database: {thread_mappings}")
 
             task_id = thread_mappings.get(thread_ts)
-            print(f"Resolved Task ID: {task_id}")
+            # print(f"Resolved Task ID: {task_id}")
 
             current_tasks = client_info.get("current_tasks", "").split(",")
             if task_id not in current_tasks:
-                print(f"Task ID {task_id} is not active. Ignoring message in thread {thread_ts}.")
+                # print(f"Task ID {task_id} is not active. Ignoring message in thread {thread_ts}.")
                 return
 
             if task_id:
@@ -263,7 +261,7 @@ def handle_thread_messages(event, say):
                 data = {"data": {"text": user_message}}
                 response = requests.post(comment_url, headers=headers, json=data)
 
-                print(f"Asana API Response: {response.status_code} - {response.text}")
+                # print(f"Asana API Response: {response.status_code} - {response.text}")
 
                 if response.status_code == 201:
                     say(text="Your revisions have been received!", thread_ts=thread_ts)
