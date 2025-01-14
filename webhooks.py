@@ -6,7 +6,12 @@ from slack_bolt.adapter.flask import SlackRequestHandler
 from slack_sdk.errors import SlackApiError
 
 from config import SLACK_BOT_TOKEN, SLACK_API_URL, ASANA_ADMIN_ID
-from database import fetch_client_data, fetch_client_data_by_task_id, update_client_thread_mapping
+from database import (
+    fetch_client_data,
+    fetch_client_data_by_task_id,
+    update_client_thread_mapping,
+    remove_task_from_current_tasks,
+)
 from asana_utils import move_task_to_archive
 from commands import app
 
@@ -33,10 +38,8 @@ def asana_webhook():
                 comment_data = comment_response.json().get("data", {})
                 comment_text = comment_data.get("text", "")
                 comment_author_id = comment_data.get("created_by", {}).get("gid")
-                # print(f"Comment fetched: {comment_text}, Author ID: {comment_author_id}")
 
                 if comment_author_id == ASANA_ADMIN_ID:
-                    # print(f"Skipping comment by bot account: {comment_text}")
                     continue
 
                 client_info = fetch_client_data_by_task_id(task_id)
@@ -50,11 +53,11 @@ def asana_webhook():
                 if not thread_ts:
                     response = app.client.chat_postMessage(
                         channel=client_info["slack_id"],
-                        text=f"Hi {client_info.get('client_name_short', 'there')}, here's the thumbnail we made for you!\n\n{comment_text}",
+                        text=f"*Hi {client_info.get('client_name_short', 'there')}, the deliverables for your video are ready. Please review them and choose whether you are satisfied, or if you'd like to request changes.* \n\n{comment_text}",
                         blocks=[
                             {
                                 "type": "section",
-                                "text": {"type": "mrkdwn", "text": f"Hi {client_info.get('client_name_short', 'there')}, here's the thumbnail we made for you!\n\n{comment_text}"},
+                                "text": {"type": "mrkdwn", "text": f"*Hi {client_info.get('client_name_short', 'there')}, the deliverables for your video are ready. Please review them and choose whether you are satisfied, or if you'd like to request changes.* \n\n{comment_text}"},
                             },
                             {
                                 "type": "actions",
@@ -66,7 +69,7 @@ def asana_webhook():
                         ],
                     )
                     thread_ts = response["ts"]
-                    # print(f"Created new thread: {thread_ts}")
+                    print(f"Created new thread: {thread_ts}")
 
                     update_client_thread_mapping(client_info["slack_id"], thread_ts, task_id)
 
@@ -90,6 +93,8 @@ def asana_webhook():
                         ],
                     )
 
+                    update_client_thread_mapping(client_info["slack_id"], thread_ts, task_id)
+
         return jsonify({"status": "success"}), 200
 
     return jsonify({"status": "failure"}), 400
@@ -102,19 +107,20 @@ def slack_actions():
     channel_id = data["channel"]["id"]
     response_url = data["response_url"]
     message_ts = data.get("message", {}).get("ts")
-
+    
     if action["action_id"] == "accept_work":
         client_info = fetch_client_data(channel_id)
         if client_info:
-            task_id = client_info.get('current_task')
+            task_id = client_info.get("current_tasks", "").split(",")[0]
             if task_id:
+                print(f"Archiving Task ID: {task_id}")
                 move_task_to_archive(task_id)
-
+                remove_task_from_current_tasks(channel_id, task_id)
                 requests.post(
                     response_url,
                     json={
                         "replace_original": True,
-                        "text": "The task has been approved and archived. Thank you!"
+                        "text": "*This request has been approved. Thank you!*"
                     }
                 )
             else:
@@ -126,57 +132,71 @@ def slack_actions():
     elif action["action_id"] == "request_revisions":
         client_info = fetch_client_data(channel_id)
         if client_info:
-            task_id = client_info.get("current_task")
+            thread_ts = message_ts
+            task_id = client_info.get("thread_mappings", {}).get(thread_ts)
+
+            if not task_id:
+                current_tasks = client_info.get("current_tasks", "").split(",")
+                task_id = current_tasks[0] if current_tasks else None
+
             if task_id:
-                thread_ts = message_ts
-                
-                thread_message = requests.post(
-                    f"{SLACK_API_URL}/chat.postMessage",
-                    headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
-                    json={
-                        "channel": channel_id,
-                        "text": "Please provide your revisions below.",
-                        "thread_ts": thread_ts,
-                    },
-                )
-                if thread_message.status_code == 200:
-                    # print("Saving mapping:", thread_ts, "->", task_id)
-                    update_client_thread_mapping(channel_id, thread_ts, task_id)
-                    requests.post(
-                        response_url,
+                print(f"Requesting revisions for Task ID: {task_id}, Thread TS: {thread_ts}")
+
+                try:
+                    thread_message = requests.post(
+                        f"{SLACK_API_URL}/chat.postMessage",
+                        headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
                         json={
-                            "replace_original": True,
-                            "text": "Your revision request has been noted. Please provide details in the thread."
-                        }
+                            "channel": channel_id,
+                            "text": "*Please provide your revisions below.*",
+                            "thread_ts": thread_ts,
+                        },
                     )
-                    return jsonify({"status": "success"})
-                else:
-                    print("Failed to post message in thread:", thread_message.text)
-                    return jsonify({"status": "failure", "error": "Failed to post message in thread"}), 500
+                    print(f"Slack API Response: {thread_message.status_code} - {thread_message.text}")
+
+                    if thread_message.status_code == 200:
+                        update_client_thread_mapping(channel_id, thread_ts, task_id)
+                        print(f"Updated thread mappings with Thread TS: {thread_ts}, Task ID: {task_id}")
+
+                        requests.post(
+                            response_url,
+                            json={
+                                "replace_original": True,
+                                "text": "*Your revision request has been noted. Please provide details in the thread.*"
+                            }
+                        )
+                        return jsonify({"status": "success"})
+                    else:
+                        print("Failed to post message in thread:", thread_message.text)
+                        return jsonify({"status": "failure", "error": "Failed to post message in thread"}), 500
+                except Exception as e:
+                    print(f"Error while posting message to Slack thread: {e}")
+                    return jsonify({"status": "failure", "error": str(e)}), 500
             else:
-                print("No current task found for this client.")
+                print("No task ID found for this thread.")
         else:
             print("Client information not found.")
 
-    return jsonify({"status": "failure", "message": "Action not handled properly"}), 400
+        return jsonify({"status": "failure", "message": "Action not handled properly"}), 400
 
 @app.event("message")
 def handle_thread_messages(event, say):
-    # print("Received message event:", event)
+    print(f"Received message event: {event}")
 
     if "thread_ts" in event:
         thread_ts = event["thread_ts"]
         channel_id = event["channel"]
         user_message = event.get("text", "")
 
+        print(f"Thread TS: {thread_ts}, Channel ID: {channel_id}, Message: {user_message}")
+
         client_info = fetch_client_data(channel_id)
         if client_info:
             thread_mappings = client_info.get("thread_mappings", {})
-            # print("Thread mappings in database:", thread_mappings)
-            # print("Thread TS in event:", thread_ts)
-            # print("Available thread_ts in mappings:", list(thread_mappings.keys()))
+            print(f"Thread Mappings in Database: {thread_mappings}")
 
             task_id = thread_mappings.get(thread_ts)
+            print(f"Resolved Task ID: {task_id}")
 
             if task_id:
                 headers = {
@@ -187,8 +207,10 @@ def handle_thread_messages(event, say):
                 data = {"data": {"text": user_message}}
                 response = requests.post(comment_url, headers=headers, json=data)
 
+                print(f"Asana API Response: {response.status_code} - {response.text}")
+
                 if response.status_code == 201:
-                    say(text="Your revision has been sent to the designer!", thread_ts=thread_ts)
+                    say(text="*Your revision has been received!*", thread_ts=thread_ts)
                 else:
                     say(text="Failed to send your revision. Please try again.", thread_ts=thread_ts)
             else:
