@@ -46,3 +46,16 @@ def remove_thread_mappings_for_task(channel_id: str, task_id: str):
         thread_mappings = client.get("thread_mappings", {})
         updated_mappings = {ts: tid for ts, tid in thread_mappings.items() if tid != task_id}
         supabase.table("clientbase").update({"thread_mappings": updated_mappings}).eq("slack_id", channel_id).execute()
+
+def update_task_history(channel_id: str, task_id: str):
+    client = fetch_client_data(channel_id)
+    if client:
+        task_history = client.get("task_history", "")
+        history_list = task_history.split(",") if task_history else []
+        
+        history_list.append(task_id)
+        if len(history_list) > 10:
+            history_list.pop(0)
+        
+        updated_history = ",".join(history_list)
+        supabase.table("clientbase").update({"task_history": updated_history}).eq("slack_id", channel_id).execute()
