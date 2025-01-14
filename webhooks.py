@@ -11,6 +11,7 @@ from database import (
     fetch_client_data_by_task_id,
     update_client_thread_mapping,
     remove_task_from_current_tasks,
+    remove_thread_mappings_for_task
 )
 from asana_utils import move_task_to_archive
 from commands import app
@@ -107,7 +108,7 @@ def slack_actions():
     channel_id = data["channel"]["id"]
     response_url = data["response_url"]
     message_ts = data.get("message", {}).get("ts")
-    
+
     if action["action_id"] == "accept_work":
         client_info = fetch_client_data(channel_id)
         if client_info:
@@ -115,7 +116,11 @@ def slack_actions():
             if task_id:
                 print(f"Archiving Task ID: {task_id}")
                 move_task_to_archive(task_id)
+
+                remove_thread_mappings_for_task(channel_id, task_id)
+
                 remove_task_from_current_tasks(channel_id, task_id)
+
                 requests.post(
                     response_url,
                     json={
