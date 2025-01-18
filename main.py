@@ -6,19 +6,23 @@ from slack_bolt.adapter.flask import SlackRequestHandler
 flask_app = Flask(__name__)
 handler = SlackRequestHandler(app)
 
-@flask_app.route("/slack/events", methods=["POST"])
+@flask_app.route("/slack/events", methods=["GET", "POST"])
 def slack_events():
     try:
-        data = request.get_json(force=True, silent=True)
+        if request.method == "GET":
+            return "Endpoint verified", 200
         
-        if not data:
-            return jsonify({"error": "Empty or malformed JSON"}), 400
-        
-        if data.get("type") == "url_verification":
-            return jsonify({"challenge": data.get("challenge")})
-        
-        if data.get("type") == "event_callback":
-            return handler.handle(request)
+        if request.method == "POST":
+            data = request.get_json(force=True, silent=True)
+            
+            if not data:
+                return jsonify({"error": "Empty or malformed JSON"}), 400
+            
+            if data.get("type") == "url_verification":
+                return jsonify({"challenge": data.get("challenge")})
+            
+            if data.get("type") == "event_callback":
+                return handler.handle(request)
 
     except Exception as e:
         print(f"Error: {e}")
