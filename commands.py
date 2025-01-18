@@ -80,7 +80,6 @@ def handle_balance(ack, command):
             text=(
                 f"Hi {client_info.get('client_name_short', ' ')}! "
                 f"You currently have *{client_info.get('current_credits', 'N/A')}* credits left. "
-                f"Running a little low? Click *<https://www.paddle.com\u200B|here>* to refill the tank!*"
             )
         )
     else:

@@ -1,8 +1,10 @@
 import requests
-from config import ASANA_ACCESS_TOKEN, ASANA_PROJECT_ID, ASANA_ARCHIVE_PROJECT_ID
+from config import ASANA_ACCESS_TOKEN, ASANA_PROJECT_ID, ASANA_ARCHIVE_PROJECT_ID, ASANA_WEBHOOK_URL
+
+if not ASANA_WEBHOOK_URL:
+    raise ValueError("ASANA_WEBHOOK_URL environment variable is not set!")
 
 def register_webhook_for_task(task_id):
-    webhook_url = "https://ae8b-2a02-2378-133e-5b5e-850c-b880-3002-b838.ngrok-free.app/asana-webhook"
     url = "https://app.asana.com/api/1.0/webhooks"
     headers = {
         "Authorization": f"Bearer {ASANA_ACCESS_TOKEN}",
@@ -11,7 +13,7 @@ def register_webhook_for_task(task_id):
     data = {
         "data": {
             "resource": task_id,
-            "target": webhook_url
+            "target": ASANA_WEBHOOK_URL
         }
     }
     requests.post(url, headers=headers, json=data)
