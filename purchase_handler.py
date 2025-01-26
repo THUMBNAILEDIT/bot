@@ -83,6 +83,29 @@ def process_payment(data):
         return jsonify({"error": str(e)}), 500
 
 
-def process_monobank_payment_webhook():
-    data = request.json
-    return process_payment(data)
+# def process_monobank_payment_webhook():
+#     data = request.json
+#     return process_payment(data)
+
+def process_monobank_payment_webhook(data):
+    try:
+        payment_status = data.get("status")
+        access_token = data.get("reference")
+        total = data.get("amount")
+        plan = data.get("plan")
+
+        if not access_token or not total:
+            return {"error": "Invalid webhook data"}, 400
+
+        if payment_status == "success":
+            response = supabase.table("clientbase").select("current_credits").eq("access_token", access_token).execute()
+            if response.data:
+                client = response.data[0]
+                current_credits = client.get("current_credits", 0)
+                new_credits = current_credits + calculate_credits(plan, total)
+                supabase.table("clientbase").update({"current_credits": new_credits}).eq("access_token", access_token).execute()
+                return {"message": "Credits updated successfully"}, 200
+
+        return {"error": "Payment not successful or invalid status"}, 400
+    except Exception as e:
+        return {"error": str(e)}, 500
