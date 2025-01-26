@@ -118,7 +118,7 @@ from webhooks import handler, asana_webhook
 from commands import app
 from slack_bolt.adapter.flask import SlackRequestHandler
 from purchase_handler import send_invoice_to_monobank, process_monobank_payment_webhook, verify_access_token
-from slack_oauth import handle_oauth_callback
+# from slack_oauth import handle_oauth_callback
 from database import get_access_token
 from logger import logger
 import requests
@@ -188,9 +188,9 @@ def monobank_webhook():
     logger.info(f"Received webhook data from Monobank: {data}")
     return process_monobank_payment_webhook(data)
 
-@flask_app.route("/slack/oauth/callback", methods=["GET"])
-def oauth_callback():
-    return handle_oauth_callback()
+# @flask_app.route("/slack/oauth/callback", methods=["GET"])
+# def oauth_callback():
+#     return handle_oauth_callback()
 
 if __name__ == "__main__":
     flask_app.run(debug=True, host="0.0.0.0", port=5000)
