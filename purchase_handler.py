@@ -115,7 +115,7 @@ def process_monobank_payment_webhook(data):
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-WEBHOOK_URL = "https://yourdomain.com/monobank/webhook"
+WEBHOOK_URL = "https://thumbnailed-it-slack-bot.onrender.com/monobank/webhook"
 
 headers = {"X-Token": MONOBANK_API_KEY}
 payload = {
