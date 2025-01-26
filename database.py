@@ -132,14 +132,21 @@ def get_access_token(client_id: str):
     
 
 def save_team_to_database(team_id: str, team_name: str, access_token: str, bot_user_id: str):
+    response = supabase.table("clientbase").select("slack_id").eq("team_id", team_id).execute()
+
+    if response.data:
+        slack_id = response.data[0]["slack_id"]
+    else:
+        raise ValueError(f"No slack_id found for team_id: {team_id}")
+
     response = supabase.table("clientbase").update({
         "team_id": team_id,
         "team_name": team_name,
         "access_token": access_token,
         "bot_user_id": bot_user_id
-    }).eq("slack_id", team_id).execute()
+    }).eq("slack_id", slack_id).execute()
 
     if not response.data:
-        raise ValueError(f"Failed to update team data for slack_id: {team_id}. Response: {response}")
+        raise ValueError(f"Failed to update team data for slack_id: {slack_id}. Response: {response}")
 
     return response.data
