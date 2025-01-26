@@ -125,17 +125,6 @@ import requests
 
 flask_app = Flask(__name__)
 
-def authorize(enterprise_id, team_id, user_id):
-    try:
-        access_token = get_access_token(team_id)  # Fetch the access token from your database
-        return {"bot_token": access_token}
-    except ValueError as e:
-        logger.error(f"Authorization failed: {str(e)}")
-        raise Exception("Authorization failed")
-
-handler = SlackRequestHandler(app)
-app.authorize = authorize
-
 @flask_app.route("/slack/events", methods=["GET", "POST"])
 def slack_events():
     try:
