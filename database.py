@@ -139,5 +139,7 @@ def save_team_to_database(team_id: str, team_name: str, access_token: str, bot_u
         "bot_user_id": bot_user_id
     }).eq("slack_id", team_id).execute()
 
-    if response.status_code != 200:
-        raise ValueError(f"Failed to update team data for slack_id: {team_id}")
+    if response.error:
+        raise ValueError(f"Failed to update team data for slack_id: {team_id}. Error: {response.error}")
+
+    return response.data
