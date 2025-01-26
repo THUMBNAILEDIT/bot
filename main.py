@@ -43,11 +43,25 @@ import requests
 flask_app = Flask(__name__)
 handler = SlackRequestHandler(app)
 
-@flask_app.route("/slack/events", methods=["POST"])
+# @flask_app.route("/slack/events", methods=["POST"])
+# def slack_events():
+#     try:
+#         return handler.handle(request)
+#     except Exception as e:
+#         return jsonify({"error": "Invalid request format", "message": str(e)}), 400
+
+@flask_app.route("/slack/events", methods=["GET", "POST"])
 def slack_events():
     try:
-        return handler.handle(request)
+        if request.method == "GET":
+            print("GET request received at /slack/events")
+            return "Endpoint verified", 200
+
+        if request.method == "POST":
+            return handler.handle(request)
+
     except Exception as e:
+        print(f"Error: {e}")
         return jsonify({"error": "Invalid request format", "message": str(e)}), 400
 
 @flask_app.route("/slack/commands", methods=["POST"])
