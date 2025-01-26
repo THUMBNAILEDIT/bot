@@ -132,12 +132,12 @@ def get_access_token(client_id: str):
     
 
 def save_team_to_database(team_id: str, team_name: str, access_token: str, bot_user_id: str):
-    response = supabase.table("clientbase").upsert({
+    response = supabase.table("clientbase").update({
         "team_id": team_id,
         "team_name": team_name,
         "access_token": access_token,
         "bot_user_id": bot_user_id
-    }).execute()
+    }).eq("slack_id", team_id).execute()
 
     if response.status_code != 200:
-        raise ValueError(f"Failed to save team data for {team_id}")
+        raise ValueError(f"Failed to update team data for slack_id: {team_id}")
