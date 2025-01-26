@@ -1,6 +1,8 @@
 import requests
 from flask import request, jsonify
 from database import supabase
+import logging
+import requests
 
 MONOBANK_API_URL = "https://api.monobank.ua/api/merchant/invoice/create"
 MONOBANK_API_KEY = "uwr-ibObJ9VYrqPKJa_mcyepvk-Og8g1vtc9WDeLBm7E"
@@ -109,3 +111,20 @@ def process_monobank_payment_webhook(data):
         return {"error": "Payment not successful or invalid status"}, 400
     except Exception as e:
         return {"error": str(e)}, 500
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+WEBHOOK_URL = "https://yourdomain.com/monobank/webhook"
+
+headers = {"X-Token": MONOBANK_API_KEY}
+payload = {
+    "webHookUrl": WEBHOOK_URL
+}
+
+response = requests.post("https://api.monobank.ua/api/merchant/invoice/webhook", json=payload, headers=headers)
+
+if response.status_code == 200:
+    logger.info("Webhook successfully set!")
+else:
+    logger.error(f"Failed to set webhook: {response.status_code}, {response.json()}")
