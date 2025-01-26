@@ -243,11 +243,11 @@ from database import get_access_token
 from logger import logger
 from slack_bolt import App
 from slack_bolt.adapter.flask import SlackRequestHandler
+from config import SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET
 
-# Настройка Slack App
 app = App(
-    signing_secret="your_signing_secret",
-    token="xoxb-your-static-bot-token"
+    signing_secret=SLACK_SIGNING_SECRET,
+    token=SLACK_BOT_TOKEN
 )
 
 flask_app = Flask(__name__)
