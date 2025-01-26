@@ -129,3 +129,15 @@ def get_access_token(client_id: str):
         return response.data[0]["access_token"]
     else:
         raise ValueError(f"AccessToken not found for client_id: {client_id}")
+    
+
+def save_team_to_database(team_id: str, team_name: str, access_token: str, bot_user_id: str):
+    response = supabase.table("clientbase").upsert({
+        "team_id": team_id,
+        "team_name": team_name,
+        "access_token": access_token,
+        "bot_user_id": bot_user_id
+    }).execute()
+
+    if response.status_code != 200:
+        raise ValueError(f"Failed to save team data for {team_id}")
