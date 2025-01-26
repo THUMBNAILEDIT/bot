@@ -127,4 +127,4 @@ response = requests.post("https://api.monobank.ua/api/merchant/invoice/webhook",
 if response.status_code == 200:
     logger.info("Webhook successfully set!")
 else:
-    logger.error(f"Failed to set webhook: {response.status_code}, {response.json()}")
+    logger.error(f"Failed to set webhook: {response.status_code}, Response: {response.text}")
