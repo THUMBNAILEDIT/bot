@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify, render_template
+
+from payment.validate_webhook_request import validate_request
 from webhooks import handler, asana_webhook
 from commands import app
 from slack_bolt.adapter.flask import SlackRequestHandler
-from purchase_handler import send_invoice_to_monobank, process_monobank_payment_webhook, verify_access_token
+from purchase_handler import process_monobank_payment_webhook, verify_access_token, send_invoice_to_monobank
 
 flask_app = Flask(__name__)
 handler = SlackRequestHandler(app)
@@ -51,10 +53,24 @@ def create_invoice():
     response, status_code = send_invoice_to_monobank(total, access_token)
     return jsonify(response), status_code
 
-@flask_app.route("/monobank/webhook", methods=["POST"])
+@flask_app.route("/monobank/webhook", methods=["POST", "GET"])
 def monobank_webhook():
-    data = request.get_json()
-    return process_monobank_payment_webhook(data)
+    x_sign_base64 = request.headers.get('X-Sign')
+    body_bytes = request.get_data()
+    body = request.get_json()
+
+    if not x_sign_base64 or not body_bytes:
+        return jsonify({"error": "Missing X-Sign header or body"}), 400
+
+    try:
+        # Validate the request
+        if validate_request(x_sign_base64, body_bytes):
+            process_monobank_payment_webhook(body)
+            return jsonify({"status": "OK"}), 200
+        else:
+            return jsonify({"status": "NOT OK"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ========================================================================================================
 

@@ -8,7 +8,7 @@ from database import (
     get_access_token
 )
 from asana_utils import create_asana_task, register_webhook_for_task
-from config import SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET
+from config import SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET, BACKEND_BASEURL
 
 app = App(token=SLACK_BOT_TOKEN, signing_secret=SLACK_SIGNING_SECRET)
 
@@ -98,7 +98,7 @@ def handle_balance(ack, command):
     if client_info:
         try:
             access_token = get_access_token(channel_id)
-            payment_url = f"https://thumbnailed-it-slack-bot.onrender.com/pricing/{access_token}"
+            payment_url = f"{BACKEND_BASEURL}pricing/{access_token}"
             app.client.chat_postMessage(
                 channel=channel_id,
                 text=(

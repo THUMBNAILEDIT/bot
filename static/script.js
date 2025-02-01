@@ -1,9 +1,10 @@
 const accessToken = document.body.dataset.accessToken;
+const baseUrl = "https://mandatory-spanish-tsunami-montreal.trycloudflare.com/";
 
 function sendPurchaseRequest(plan, total) {
-  alert(`Plan: ${plan}, Total: ${total}, AccessToken: ${accessToken}`);
+//  alert(`Plan: ${plan}, Total: ${total}, AccessToken: ${accessToken}`);
 
-  fetch("/api/create-invoice", {
+  fetch(baseUrl + "api/create-invoice", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -22,7 +23,7 @@ function sendPurchaseRequest(plan, total) {
       }
     })
     .then((data) => {
-      alert(`Purchase is successful!`);
+//      alert(`Purchase is successful!`);
       window.location.href = data.payment_url;
     })
     .catch((error) => {
@@ -153,7 +154,7 @@ const annualTotalAmount = document.getElementById("annual-total-amount");
 const annualMonthlyAmount = document.getElementById("annual-monthly-amount");
 
 const annualPricingTable = {
-  1: { 1: 2592, 2: 4925, 3: 6998 },
+  1: { 1: 2594, 2: 4925, 3: 6998 },
   2: { 1: 4925, 2: 8813, 3: 11664 },
   3: { 1: 6698, 2: 11664, 3: 13997 },
   4: { 1: 8813, 2: 13478, 3: 18662 },
