@@ -158,22 +158,17 @@ def handle_modal_submission(ack, body, client):
         return
 
     task_notes = f"""ORDER INFORMATION
-Order type: YouTube Thumbnail
-Main deliverables:
-    • 1920 x 1080 image (.JPG)
-    • Project file (.PSD)
-Thumbnail packages amount: {thumbnail_packages}
-Additional resizes: {client_info.get('resize', 'None')}
+Packages amount: {thumbnail_packages}
+Resizes: {client_info.get('resize', 'None')}.
 
-CLIENT INFORMATION
-Client: {client_info.get('client_name_full', 'Unknown')} 
-Client's channel: {client_info.get('client_channel_name', 'Unknown')} ({client_info.get('client_channel_link', 'Unknown')})
-Client's pictures: {client_info.get('face_photos', 'None')}
+AUTHOR INFORMATION
+Author's name: {client_info.get('client_name_full', 'Unknown')}
+Channel link: {client_info.get('client_channel_link', 'Unknown')}
+Author's photo: {client_info.get('face_photos', 'None')}
 
 STYLE
-Client's branding: {client_info.get('branding', 'None')}
-Client's preferences: {client_info.get('client_wishes', 'Unknown')}
-Thumbnail examples: {client_info.get('client_thumbnail_examples', 'Unknown')}
+Author's branding: {client_info.get('branding', 'None')}
+Author's preferences: {client_info.get('client_wishes', 'Unknown')}
 
 TASK DESCRIPTION
 Video Link: {video_link}
