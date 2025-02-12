@@ -31,8 +31,6 @@ def slack_commands():
 def asana_webhook_route():
     return asana_webhook()
 
-# ========================================================================================================
-
 @flask_app.route("/pricing/<access_token>")
 def pricing_page(access_token):
     response = verify_access_token(access_token)
@@ -63,7 +61,6 @@ def monobank_webhook():
         return jsonify({"error": "Missing X-Sign header or body"}), 400
 
     try:
-        # Validate the request
         if validate_request(x_sign_base64, body_bytes):
             process_monobank_payment_webhook(body)
             return jsonify({"status": "OK"}), 200
@@ -71,8 +68,6 @@ def monobank_webhook():
             return jsonify({"status": "NOT OK"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-# ========================================================================================================
 
 if __name__ == "__main__":
     flask_app.run(debug=True, host="0.0.0.0", port=5000)

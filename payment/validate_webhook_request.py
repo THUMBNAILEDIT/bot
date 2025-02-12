@@ -5,8 +5,6 @@ import requests
 
 from config import MONOBANK_API_BASEURL, MONOBANK_API_KEY
 
-
-# Function to fetch the public key from Monobank API
 def fetch_public_key():
     url = MONOBANK_API_BASEURL+"merchant/pubkey"
     headers = {
@@ -32,4 +30,3 @@ def validate_request(x_sign_base64, body_bytes):
     except Exception as e:
         print(f"Validation error: {e}")
         return False
-

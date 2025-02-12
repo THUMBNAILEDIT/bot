@@ -15,8 +15,6 @@ ASANA_ARCHIVE_PROJECT_ID = os.getenv("ASANA_ARCHIVE_PROJECT_ID")
 ASANA_WORKSPACE_ID = os.getenv("ASANA_WORKSPACE_ID")
 ASANA_ADMIN_ID = os.getenv("ASANA_ADMIN_ID")
 ASANA_WEBHOOK_URL = os.getenv("ASANA_WEBHOOK_URL")
-
 MONOBANK_API_KEY = os.getenv("MONOBANK_API_KEY")
-
-MONOBANK_API_BASEURL = "https://api.monobank.ua/api/"
-BACKEND_BASEURL = "https://mandatory-spanish-tsunami-montreal.trycloudflare.com/"
+MONOBANK_API_BASEURL = os.getenv("MONOBANK_API_BASEURL")
+BACKEND_BASEURL = os.getenv("BACKEND_BASEURL")

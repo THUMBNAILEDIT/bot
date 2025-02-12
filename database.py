@@ -60,8 +60,6 @@ def update_task_history(channel_id: str, task_id: str):
         updated_history = ",".join(history_list)
         supabase.table("clientbase").update({"task_history": updated_history}).eq("slack_id", channel_id).execute()
 
-# ========================================================================================================
-
 def get_access_token(client_id: str):
     response = supabase.table("clientbase").select("access_token").eq("slack_id", client_id).execute()
 
@@ -69,4 +67,3 @@ def get_access_token(client_id: str):
         return response.data[0]["access_token"]
     else:
         raise ValueError(f"AccessToken not found for client_id: {client_id}")
-    

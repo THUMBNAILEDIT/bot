@@ -59,7 +59,8 @@ def handle_request(ack, body, client):
                     "options": [
                         {"text": {"type": "plain_text", "text": "1 package"}, "value": "1"},
                         {"text": {"type": "plain_text", "text": "2 packages"}, "value": "2"},
-                        {"text": {"type": "plain_text", "text": "3 packages"}, "value": "3"}
+                        {"text": {"type": "plain_text", "text": "3 packages"}, "value": "3"},
+                        {"text": {"type": "plain_text", "text": "4 packages"}, "value": "4"}
                     ]
                 }
             }
@@ -68,26 +69,6 @@ def handle_request(ack, body, client):
     }
 
     client.views_open(trigger_id=body["trigger_id"], view=modal_view)
-
-# @app.command("/balance")
-# def handle_balance(ack, command):
-#     ack()
-#     channel_id = command["channel_id"]
-#     client_info = fetch_client_data(channel_id)
-    
-#     if client_info:
-#         app.client.chat_postMessage(
-#             channel=channel_id,
-#             text=(
-#                 f"Hi {client_info.get('client_name_short', ' ')}! "
-#                 f"You currently have *{client_info.get('current_credits', 'N/A')}* credits left. "
-#             )
-#         )
-#     else:
-#         app.client.chat_postMessage(
-#             channel=channel_id,
-#             text="*Error:* We couldn't find your client info. Please ensure your Slack channel is registered.\n\n"
-#         )
 
 @app.command("/balance")
 def handle_balance(ack, command):
@@ -138,7 +119,7 @@ def handle_modal_submission(ack, body, client):
 
     thumbnail_packages = state_values["thumbnail_packages"]["select"]["selected_option"]["value"]
 
-    package_credits_map = {"1": 1, "2": 2, "3": 3}
+    package_credits_map = {"1": 1, "2": 2, "3": 3, "4": 4}
     required_credits = package_credits_map.get(thumbnail_packages, 1)
 
     client_info = fetch_client_data(channel_id)
