@@ -186,6 +186,7 @@ def update_payment_info(data):
 
 def process_monobank_payment_webhook(data):
     try:
+        print("Webhook data:", data)
         payment_status = data.get("status")
         access_token = data.get("reference")
         invoice_id = data.get("invoiceId")  # This should uniquely identify the transaction
