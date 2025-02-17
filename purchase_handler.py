@@ -185,12 +185,10 @@ def update_payment_info(data):
         supabase.table("clientbase").update(new_payment_info).eq("access_token", access_token).execute()
 
 def process_monobank_payment_webhook(data):
-    """
-    This is typically called by the monobank webhook after a user pays.
-    """
     try:
         payment_status = data.get("status")
         access_token = data.get("reference")
+        invoice_id = data.get("invoiceId")          # This identifies the transaction
         total_str = data.get("destination", "")
         if not total_str.isdigit():
             return {"error": "Invalid webhook data"}, 400
@@ -201,17 +199,27 @@ def process_monobank_payment_webhook(data):
             return {"error": "Invalid webhook data"}, 400
 
         if payment_status == "success":
+            # 1) Check if we've already processed this invoice_id
+            existing = supabase.table("transactions").select("*").eq("invoiceId", invoice_id).execute()
+            if existing.data:
+                # Already processed => skip
+                return {"message": "Transaction already processed"}, 200
+
+            # 2) Not processed => proceed
             response = supabase.table("clientbase").select("current_credits").eq("access_token", access_token).execute()
             if response.data:
                 client = response.data[0]
                 current_credits = client.get("current_credits", 0)
 
-                plan = get_plan_from_total(total)  # figure out monthly, annual, or onetime
+                # figure out plan from total
+                plan = get_plan_from_total(total)
                 new_credits = current_credits + calculate_credits(plan, total)
 
+                # update the user's credits
                 supabase.table("clientbase").update({"current_credits": new_credits}).eq("access_token", access_token).execute()
 
-                update_payment_info(data)
+                # 3) Mark this invoice as processed so we never double-credit
+                supabase.table("transactions").insert({"invoiceId": invoice_id, "status": "processed"}).execute()
 
                 return {"message": "Credits updated successfully"}, 200
 
