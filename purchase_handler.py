@@ -1,13 +1,91 @@
-from flask import jsonify
+# purchase_handler.py
 
+from flask import jsonify
 from config import MONOBANK_API_BASEURL, BACKEND_BASEURL, MONOBANK_API_KEY
 from database import supabase
 import requests
 import datetime
 import pytz
 
-from payment.payment_plan import calculate_credits_with_workaround, get_plan_from_total, PricingPlans
+##############################
+# UNIFIED DICTIONARIES
+##############################
 
+# Monthly dictionary (unchanged, since monthly is correct)
+monthly_pricing_table = {
+    240: 4, 456: 8, 648: 12, 816: 16, 960: 20,
+    1080: 24, 1092: 28, 1248: 32, 1440: 40,
+    1728: 48, 2016: 56, 1296: 36, 2592: 72, 3024: 84
+}
+
+# Corrected annual dictionary
+annual_pricing_table = {
+    1080: 2, 1596: 3, 2100: 4, 2580: 5, 3060: 6, 3516: 7, 3948: 8, 4380: 9,
+    4788: 10, 5172: 11, 5556: 12, 5916: 13, 6264: 14, 6600: 15, 6912: 16, 7212: 17,
+    7500: 18, 7764: 19, 8028: 20, 8268: 21, 8484: 22, 8700: 23, 8892: 24, 9060: 25,
+    9228: 26, 9372: 27, 9504: 28, 9624: 29, 9720: 30, 10044: 31, 10368: 32, 10692: 33,
+    11016: 34, 11340: 35, 11664: 36, 11988: 37, 12312: 38, 12636: 39, 12960: 40, 13284: 41,
+    13608: 42, 13932: 43, 14256: 44, 14580: 45, 14904: 46, 15228: 47, 15552: 48, 15876: 49,
+    16200: 50, 16524: 51, 16848: 52, 17172: 53, 17496: 54, 17820: 55, 18144: 56, 18468: 57,
+    18792: 58, 19116: 59, 19440: 60, 20088: 62, 20412: 63, 20736: 64, 21384: 66, 22032: 68,
+    22356: 69, 22680: 70, 23328: 72, 23976: 74, 24300: 75, 24624: 76, 25272: 78, 25920: 80,
+    26244: 81, 26568: 82, 27216: 84, 27864: 86, 28188: 87, 28512: 88, 29160: 90, 29808: 92,
+    30132: 93, 30456: 94, 31104: 96, 31752: 98, 32076: 99, 32400: 100, 33048: 102, 33696: 104,
+    34020: 105, 34344: 106, 34992: 108, 35640: 110, 35964: 111, 36288: 112, 36936: 114,
+    37584: 116, 37908: 117, 38232: 118, 38880: 120, 39852: 123, 40176: 124, 40824: 126,
+    41472: 128, 41796: 129, 42768: 132, 43740: 135, 44064: 136, 44712: 138, 45360: 140,
+    45684: 141, 46656: 144, 47628: 147, 47952: 148, 48600: 150, 49248: 152, 49572: 153,
+    50544: 156, 51516: 159, 51840: 160, 52488: 162, 53136: 164, 53460: 165, 54432: 168,
+    55404: 171, 55728: 172, 56376: 174, 57024: 176, 57672: 178, 58320: 180, 59616: 184,
+    60912: 188, 62208: 192, 63504: 196, 64800: 200, 66096: 204, 67392: 208, 68688: 212,
+    69984: 216, 71280: 220, 72576: 224, 73872: 228, 75168: 232, 76464: 236, 77760: 240,
+}
+
+# Corrected pay-as-you-go dictionary
+one_time_pricing_table = {
+    60: 1,    # q=1
+    118: 2,   # q=2
+    173: 3,   # q=3
+    227: 4,   # q=4
+    278: 5,   # q=5
+    327: 6,   # q=6
+    373: 7,   # q=7
+    418: 8,   # q=8
+    460: 9,   # q=9
+    500: 10,  # q=10
+}
+
+##############################
+# UNIFIED LOGIC
+##############################
+
+def get_plan_from_total(total: int):
+    """
+    Determine which plan the user purchased based on the total cost.
+    """
+    if total in monthly_pricing_table:
+        return "monthly"
+    elif total in annual_pricing_table:
+        return "annual"
+    elif total in one_time_pricing_table:
+        return "onetime"
+    return None
+
+def calculate_credits(plan: str, total: int) -> int:
+    """
+    Return the number of credits based on plan type and total cost.
+    """
+    if plan == "monthly":
+        return monthly_pricing_table.get(total, 0)
+    elif plan == "annual":
+        return annual_pricing_table.get(total, 0)
+    elif plan == "onetime":
+        return one_time_pricing_table.get(total, 0)
+    return 0
+
+##############################
+# EXISTING FUNCTIONS
+##############################
 
 def verify_access_token(access_token):
     if not access_token:
@@ -44,31 +122,11 @@ def send_invoice_to_monobank(total, access_token):
     except Exception as e:
         return {"error": str(e)}, 500
 
-def calculate_credits(plan, total):
-    if plan == "monthly":
-        pricing_table = {
-            240: 4, 456: 8, 648: 12, 816: 16, 960: 20,
-            1080: 24, 1092: 28, 1248: 32, 1440: 40,
-            1728: 48, 2016: 56, 1296: 36, 2592: 72, 3024: 84
-        }
-        return pricing_table.get(total, 0)
-    elif plan == "annual":
-        pricing_table = {
-            2594: 4, 4925: 8, 6998: 12, 8813: 16, 10368: 20,
-            11664: 24, 12701: 28, 13478: 32, 15552: 40,
-            18662: 48, 21773: 56, 13997: 36, 23328: 60, 27994: 72, 32659: 84
-        }
-        return pricing_table.get(total, 0)
-    elif plan == "onetime":
-        pricing_table = {
-            70: 1, 140: 2, 210: 3, 260: 4, 325: 5,
-            390: 6, 455: 7, 480: 8, 540: 9, 600: 10,
-        }
-        return pricing_table.get(total, 0)
-    else:
-        return 0
-
 def process_payment(data):
+    """
+    Example function if you're using direct process instead of monobank webhook.
+    Might not be used if you're only using monobank webhook approach.
+    """
     try:
         payment_status = data.get("status")
         access_token = data.get("reference")
@@ -94,26 +152,35 @@ def process_payment(data):
 
 def load_card_token(invoice_id):
     try:
-        response = requests.get(f"https://api.monobank.ua/api/merchant/invoice/status?invoiceId={invoice_id}", headers={"X-Token": MONOBANK_API_KEY})
-        card_token = response.json().get("walletData").get("cardToken", None)
+        response = requests.get(f"{MONOBANK_API_BASEURL}merchant/invoice/status?invoiceId={invoice_id}",
+                                headers={"X-Token": MONOBANK_API_KEY})
+        card_token = response.json().get("walletData", {}).get("cardToken", None)
         if card_token:
             return card_token
         else:
             print("No card token found, json response:", response.json())
             return None
     except Exception as e:
-        print("Error loading card token")
+        print("Error loading card token:", e)
         return None
 
-
 def update_payment_info(data):
-    total = int(data.get("destination"))
+    """
+    Called after a successful monobank webhook to store subscription details, if any.
+    """
+    total_str = data.get("destination", "")
+    if not total_str.isdigit():
+        return  # or handle error
+
+    total = int(total_str)
     access_token = data.get("reference")
     invoice_id = data.get("invoiceId")
 
     card_token = load_card_token(invoice_id)
-    payment_plan = get_plan_from_total(total)
-    subscription_period = 30 if payment_plan == PricingPlans.Monthly else 365 if payment_plan == PricingPlans.Annual else None
+    plan = get_plan_from_total(total)
+
+    # monthly => 30 days, annual => 365 days, else None
+    subscription_period = 30 if plan == "monthly" else 365 if plan == "annual" else None
 
     utc_timezone = pytz.utc
     current_time = datetime.datetime.now(tz=utc_timezone)
@@ -121,23 +188,27 @@ def update_payment_info(data):
 
     if subscription_period:
         new_payment_info = {
-           "subscription_amount": total,
-           "subscription_period": subscription_period,
-           "last_subscription_transaction":iso_time_str,
+            "subscription_amount": total,
+            "subscription_period": subscription_period,
+            "last_subscription_transaction": iso_time_str
+        }
+        if card_token:
+            new_payment_info["card_token"] = card_token
 
-       } | ({"card_token": card_token} if card_token else {})
-
-        (supabase.table("clientbase")
-         .update(new_payment_info)
-         .eq("access_token", access_token).execute())
+        supabase.table("clientbase").update(new_payment_info).eq("access_token", access_token).execute()
 
 def process_monobank_payment_webhook(data):
+    """
+    This is typically called by the monobank webhook after a user pays.
+    """
     try:
         payment_status = data.get("status")
         access_token = data.get("reference")
-        # total = data.get("amount") // The best way
-        total = int(data.get("destination")) if data.get("destination").isdigit() else None # But i add some shetty code like workaround for fast and easily understand))
-        # plan = data.get("plan")
+        total_str = data.get("destination", "")
+        if not total_str.isdigit():
+            return {"error": "Invalid webhook data"}, 400
+
+        total = int(total_str)
 
         if not access_token or not total:
             return {"error": "Invalid webhook data"}, 400
@@ -147,7 +218,10 @@ def process_monobank_payment_webhook(data):
             if response.data:
                 client = response.data[0]
                 current_credits = client.get("current_credits", 0)
-                new_credits = current_credits + calculate_credits_with_workaround(total)
+
+                plan = get_plan_from_total(total)  # figure out monthly, annual, or onetime
+                new_credits = current_credits + calculate_credits(plan, total)
+
                 supabase.table("clientbase").update({"current_credits": new_credits}).eq("access_token", access_token).execute()
 
                 update_payment_info(data)
@@ -155,5 +229,6 @@ def process_monobank_payment_webhook(data):
                 return {"message": "Credits updated successfully"}, 200
 
         return {"error": "Payment not successful or invalid status"}, 400
+
     except Exception as e:
         return {"error": str(e)}, 500
