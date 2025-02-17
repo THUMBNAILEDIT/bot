@@ -188,44 +188,53 @@ def process_monobank_payment_webhook(data):
     try:
         payment_status = data.get("status")
         access_token = data.get("reference")
-        invoice_id = data.get("invoiceId")
-        print("Invoice ID received:", invoice_id)# This identifies the transaction
+        invoice_id = data.get("invoiceId")  # This should uniquely identify the transaction
         total_str = data.get("destination", "")
         if not total_str.isdigit():
             return {"error": "Invalid webhook data"}, 400
 
         total = int(total_str)
 
-        if not access_token or not total:
+        if not access_token or not total or not invoice_id:
             return {"error": "Invalid webhook data"}, 400
 
         if payment_status == "success":
+            # Log invoice data for debugging
+            print("Webhook received for invoice_id:", invoice_id)
+            
             # 1) Check if we've already processed this invoice_id
             existing = supabase.table("transactions").select("*").eq("invoiceId", invoice_id).execute()
-            print("Existing transactions for invoice:", existing.data)
+            print("Existing transaction records for invoice:", existing.data)
             if existing.data:
-                # Already processed => skip
+                # Already processed => skip crediting
                 return {"message": "Transaction already processed"}, 200
 
-            # 2) Not processed => proceed
-            response = supabase.table("clientbase").select("current_credits").eq("access_token", access_token).execute()
+            # 2) Proceed with crediting
+            response = supabase.table("clientbase").select("current_credits, slack_id").eq("access_token", access_token).execute()
             if response.data:
                 client = response.data[0]
                 current_credits = client.get("current_credits", 0)
-
-                # figure out plan from total
                 plan = get_plan_from_total(total)
                 new_credits = current_credits + calculate_credits(plan, total)
 
-                # update the user's credits
+                # Update the user's credits
                 supabase.table("clientbase").update({"current_credits": new_credits}).eq("access_token", access_token).execute()
 
-                # 3) Mark this invoice as processed so we never double-credit
+                # 3) Mark this invoice as processed
                 supabase.table("transactions").insert({"invoiceId": invoice_id, "status": "processed"}).execute()
+
+                # Optionally send a Slack message here
+                # For example:
+                # credited = new_credits - current_credits
+                # slack_id = client.get("slack_id")
+                # if slack_id:
+                #     text_msg = f"Your payment for the purchase of {credited} packages was successful. The total balance is {new_credits} packages."
+                #     client.chat_postMessage(channel=slack_id, text=text_msg)
 
                 return {"message": "Credits updated successfully"}, 200
 
         return {"error": "Payment not successful or invalid status"}, 400
 
     except Exception as e:
+        print("Error in process_monobank_payment_webhook:", e)
         return {"error": str(e)}, 500
