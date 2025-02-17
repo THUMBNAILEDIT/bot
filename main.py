@@ -42,6 +42,7 @@ def pricing_page(access_token):
 @flask_app.route("/api/create-invoice", methods=["POST"])
 def create_invoice():
     data = request.get_json()
+    print("Webhook data from main.py route:", data)
     total = data.get("total")
     access_token = data.get("access_token")
 
@@ -53,9 +54,11 @@ def create_invoice():
 
 @flask_app.route("/monobank/webhook", methods=["POST", "GET"])
 def monobank_webhook():
+    print("monobank_webhook route called")
     x_sign_base64 = request.headers.get('X-Sign')
     body_bytes = request.get_data()
     body = request.get_json()
+    print("Monobank webhook JSON body:", body)
 
     if not x_sign_base64 or not body_bytes:
         return jsonify({"error": "Missing X-Sign header or body"}), 400
