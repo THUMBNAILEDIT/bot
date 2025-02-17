@@ -137,34 +137,6 @@ def send_invoice_to_monobank(total, access_token):
     except Exception as e:
         return {"error": str(e)}, 500
 
-def process_payment(data):
-    """
-    Example function if you're using direct process instead of monobank webhook.
-    Might not be used if you're only using monobank webhook approach.
-    """
-    try:
-        payment_status = data.get("status")
-        access_token = data.get("reference")
-        total = data.get("amount")
-        plan = data.get("plan")
-
-        if not access_token or not total:
-            return jsonify({"error": "Invalid webhook data"}), 400
-
-        if payment_status == "success":
-            response = supabase.table("clientbase").select("current_credits").eq("access_token", access_token).execute()
-            if response.data:
-                client = response.data[0]
-                current_credits = client.get("current_credits", 0)
-                new_credits = current_credits + calculate_credits(plan, total)
-                supabase.table("clientbase").update({"current_credits": new_credits}).eq("access_token", access_token).execute()
-                return jsonify({"message": "Credits updated successfully"}), 200
-
-        return jsonify({"error": "Payment not successful or invalid status"}), 400
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 def load_card_token(invoice_id):
     try:
         response = requests.get(f"{MONOBANK_API_BASEURL}merchant/invoice/status?invoiceId={invoice_id}",
