@@ -186,54 +186,71 @@ def update_payment_info(data):
 
 def process_monobank_payment_webhook(data):
     try:
+        # Log the entire webhook payload for debugging
         print("Webhook data:", data)
+        
         payment_status = data.get("status")
         access_token = data.get("reference")
-        invoice_id = data.get("invoiceId")  # This should uniquely identify the transaction
+        invoice_id = data.get("invoiceId")  # Check key: if your payload uses "invoice_id", adjust accordingly.
+        print("Invoice ID received:", invoice_id)
+        
         total_str = data.get("destination", "")
         if not total_str.isdigit():
+            print("Invalid destination value:", total_str)
             return {"error": "Invalid webhook data"}, 400
 
         total = int(total_str)
-
         if not access_token or not total or not invoice_id:
+            print("Missing required data:", access_token, total, invoice_id)
             return {"error": "Invalid webhook data"}, 400
 
         if payment_status == "success":
-            # Log invoice data for debugging
-            print("Webhook received for invoice_id:", invoice_id)
-            
-            # 1) Check if we've already processed this invoice_id
+            # Check if we've already processed this invoice_id
             existing = supabase.table("transactions").select("*").eq("invoiceId", invoice_id).execute()
-            print("Existing transaction records for invoice:", existing.data)
+            print("Existing transactions for invoice:", existing.data)
             if existing.data:
-                # Already processed => skip crediting
+                print("Transaction already processed, skipping credit update.")
                 return {"message": "Transaction already processed"}, 200
 
-            # 2) Proceed with crediting
+            # Proceed with credit update
             response = supabase.table("clientbase").select("current_credits, slack_id").eq("access_token", access_token).execute()
             if response.data:
                 client = response.data[0]
                 current_credits = client.get("current_credits", 0)
-                plan = get_plan_from_total(total)
-                new_credits = current_credits + calculate_credits(plan, total)
+                slack_id = client.get("slack_id")
+                plan = get_plan_from_total(total)  # e.g., "monthly", "annual", or "onetime"
+                added_credits = calculate_credits(plan, total)
+                new_credits = current_credits + added_credits
 
                 # Update the user's credits
                 supabase.table("clientbase").update({"current_credits": new_credits}).eq("access_token", access_token).execute()
 
-                # 3) Mark this invoice as processed
+                # Insert the transaction record to avoid re-processing
                 supabase.table("transactions").insert({"invoiceId": invoice_id, "status": "processed"}).execute()
+                print("Inserted transaction for invoice:", invoice_id)
 
-                # Optionally send a Slack message here
-                # For example:
-                # credited = new_credits - current_credits
-                # slack_id = client.get("slack_id")
-                # if slack_id:
-                #     text_msg = f"Your payment for the purchase of {credited} packages was successful. The total balance is {new_credits} packages."
-                #     client.chat_postMessage(channel=slack_id, text=text_msg)
+                # Construct Slack message
+                if plan == "onetime":
+                    text_msg = (f"Your payment for the purchase of {added_credits} packages was successful. "
+                                f"The total balance is {current_credits} + {added_credits} = {new_credits} packages.")
+                elif plan == "annual":
+                    text_msg = (f"Your payment for the purchase of {added_credits} annual subscriptions was successful. "
+                                f"The total balance is {current_credits} + {added_credits} = {new_credits} packages.")
+                elif plan == "monthly":
+                    text_msg = (f"Your payment for the purchase of {added_credits} monthly subscriptions was successful. "
+                                f"The total balance is {current_credits} + {added_credits} = {new_credits} packages.")
+                else:
+                    text_msg = f"Your payment was successful. The total balance is {new_credits} packages."
+
+                # Send the Slack message using the user's slack_id
+                if slack_id:
+                    client.chat_postMessage(channel=slack_id, text=text_msg)
+                else:
+                    print("No slack_id found for user with access_token:", access_token)
 
                 return {"message": "Credits updated successfully"}, 200
 
+        print("Payment not successful or invalid status.")
         return {"error": "Payment not successful or invalid status"}, 400
 
     except Exception as e:
