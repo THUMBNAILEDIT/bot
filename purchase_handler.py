@@ -188,7 +188,8 @@ def process_monobank_payment_webhook(data):
     try:
         payment_status = data.get("status")
         access_token = data.get("reference")
-        invoice_id = data.get("invoiceId")          # This identifies the transaction
+        invoice_id = data.get("invoiceId")
+        print("Invoice ID received:", invoice_id)# This identifies the transaction
         total_str = data.get("destination", "")
         if not total_str.isdigit():
             return {"error": "Invalid webhook data"}, 400
@@ -201,6 +202,7 @@ def process_monobank_payment_webhook(data):
         if payment_status == "success":
             # 1) Check if we've already processed this invoice_id
             existing = supabase.table("transactions").select("*").eq("invoiceId", invoice_id).execute()
+            print("Existing transactions for invoice:", existing.data)
             if existing.data:
                 # Already processed => skip
                 return {"message": "Transaction already processed"}, 200
