@@ -280,6 +280,9 @@ def process_monobank_payment_webhook(data):
 
                 # Update the user's credits
                 supabase.table("clientbase").update({"current_credits": new_credits}).eq("access_token", access_token).execute()
+                
+                # Update subscription info
+                update_payment_info(data)
 
                 # Insert the transaction record to avoid re-processing
                 supabase.table("transactions").insert({"invoiceId": invoice_id, "status": "processed"}).execute()
