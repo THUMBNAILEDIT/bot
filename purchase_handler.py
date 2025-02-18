@@ -186,14 +186,14 @@ def update_payment_info(data):
 
 def process_monobank_payment_webhook(data):
     try:
-        # Log the entire webhook payload for debugging
         print("Webhook data:", data)
-        
+
         payment_status = data.get("status")
         access_token = data.get("reference")
-        invoice_id = data.get("invoiceId")  # Check key: if your payload uses "invoice_id", adjust accordingly.
+        # Якщо Monobank надсилає "invoice_id" (із нижнім підкресленням), то замініть invoiceId на invoice_id
+        invoice_id = data.get("invoiceId")  
         print("Invoice ID received:", invoice_id)
-        
+
         total_str = data.get("destination", "")
         if not total_str.isdigit():
             print("Invalid destination value:", total_str)
@@ -205,48 +205,86 @@ def process_monobank_payment_webhook(data):
             return {"error": "Invalid webhook data"}, 400
 
         if payment_status == "success":
-            # Check if we've already processed this invoice_id
+            # 1) Перевіряємо, чи вже є запис для цього invoice_id у таблиці transactions
             existing = supabase.table("transactions").select("*").eq("invoiceId", invoice_id).execute()
             print("Existing transactions for invoice:", existing.data)
             if existing.data:
-                print("Transaction already processed, skipping credit update.")
+                # Якщо запис уже є, це означає, що цю транзакцію обробили 
+                print("Transaction already processed. Ігноруємо повторний виклик.")
                 return {"message": "Transaction already processed"}, 200
 
-            # Proceed with credit update
+            # 2) Якщо запису немає -> обробляємо та додаємо кредити
             response = supabase.table("clientbase").select("current_credits, slack_id").eq("access_token", access_token).execute()
             if response.data:
                 client = response.data[0]
                 current_credits = client.get("current_credits", 0)
                 slack_id = client.get("slack_id")
-                plan = get_plan_from_total(total)  # e.g., "monthly", "annual", or "onetime"
+
+                plan = get_plan_from_total(total)  # (monthly, annual, onetime тощо)
                 added_credits = calculate_credits(plan, total)
                 new_credits = current_credits + added_credits
 
-                # Update the user's credits
+                # Оновлюємо кредити у clientbase
                 supabase.table("clientbase").update({"current_credits": new_credits}).eq("access_token", access_token).execute()
 
-                # Insert the transaction record to avoid re-processing
+                # 3) Вставляємо запис у таблицю transactions (щоб потім ігнорувати дублікати)
                 supabase.table("transactions").insert({"invoiceId": invoice_id, "status": "processed"}).execute()
                 print("Inserted transaction for invoice:", invoice_id)
 
-                # Construct Slack message
-                if plan == "onetime":
-                    text_msg = (f"Your payment for the purchase of {added_credits} packages was successful. "
-                                f"The total balance is {current_credits} + {added_credits} = {new_credits} packages.")
-                elif plan == "annual":
-                    text_msg = (f"Your payment for the purchase of {added_credits} annual subscriptions was successful. "
-                                f"The total balance is {current_credits} + {added_credits} = {new_credits} packages.")
-                elif plan == "monthly":
-                    text_msg = (f"Your payment for the purchase of {added_credits} monthly subscriptions was successful. "
-                                f"The total balance is {current_credits} + {added_credits} = {new_credits} packages.")
-                else:
-                    text_msg = f"Your payment was successful. The total balance is {new_credits} packages."
+                return {"message": "Credits updated successfully"}, 200
 
-                # Send the Slack message using the user's slack_id
-                if slack_id:
-                    client.chat_postMessage(channel=slack_id, text=text_msg)
-                else:
-                    print("No slack_id found for user with access_token:", access_token)
+        print("Payment not successful or invalid status.")
+        return {"error": "Payment not successful or invalid status"}, 400
+
+    except Exception as e:
+        print("Error in process_monobank_payment_webhook:", e)
+        return {"error": str(e)}, 500
+def process_monobank_payment_webhook(data):
+    try:
+        print("Webhook data:", data)
+
+        payment_status = data.get("status")
+        access_token = data.get("reference")
+        # Якщо Monobank надсилає "invoice_id" (із нижнім підкресленням), то замініть invoiceId на invoice_id
+        invoice_id = data.get("invoiceId")  
+        print("Invoice ID received:", invoice_id)
+
+        total_str = data.get("destination", "")
+        if not total_str.isdigit():
+            print("Invalid destination value:", total_str)
+            return {"error": "Invalid webhook data"}, 400
+
+        total = int(total_str)
+        if not access_token or not total or not invoice_id:
+            print("Missing required data:", access_token, total, invoice_id)
+            return {"error": "Invalid webhook data"}, 400
+
+        if payment_status == "success":
+            # 1) Перевіряємо, чи вже є запис для цього invoice_id у таблиці transactions
+            existing = supabase.table("transactions").select("*").eq("invoiceId", invoice_id).execute()
+            print("Existing transactions for invoice:", existing.data)
+            if existing.data:
+                # Якщо запис уже є, це означає, що цю транзакцію обробили 
+                print("Transaction already processed. Ігноруємо повторний виклик.")
+                return {"message": "Transaction already processed"}, 200
+
+            # 2) Якщо запису немає -> обробляємо та додаємо кредити
+            response = supabase.table("clientbase").select("current_credits, slack_id").eq("access_token", access_token).execute()
+            if response.data:
+                client = response.data[0]
+                current_credits = client.get("current_credits", 0)
+                slack_id = client.get("slack_id")
+
+                plan = get_plan_from_total(total)  # (monthly, annual, onetime тощо)
+                added_credits = calculate_credits(plan, total)
+                new_credits = current_credits + added_credits
+
+                # Оновлюємо кредити у clientbase
+                supabase.table("clientbase").update({"current_credits": new_credits}).eq("access_token", access_token).execute()
+
+                # 3) Вставляємо запис у таблицю transactions (щоб потім ігнорувати дублікати)
+                supabase.table("transactions").insert({"invoiceId": invoice_id, "status": "processed"}).execute()
+                print("Inserted transaction for invoice:", invoice_id)
 
                 return {"message": "Credits updated successfully"}, 200
 
