@@ -2,6 +2,7 @@
 
 from flask import jsonify
 from config import MONOBANK_API_BASEURL, BACKEND_BASEURL, MONOBANK_API_KEY
+from commands import app as slack_app
 from database import supabase
 import requests
 import datetime
@@ -303,7 +304,7 @@ def process_monobank_payment_webhook(data):
 
                 # Send the Slack message using the user's slack_id
                 if slack_id:
-                    client.chat_postMessage(channel=slack_id, text=text_msg)
+                    slack_app.client.chat_postMessage(channel=slack_id, text=text_msg)
                 else:
                     print("No slack_id found for user with access_token:", access_token)
 
