@@ -129,11 +129,13 @@ def handle_modal_submission(ack, body, client):
 
     current_credits = client_info.get("current_credits", 0)
     if current_credits < required_credits:
+        access_token = get_access_token(channel_id)
+        payment_url = f"{BACKEND_BASEURL}pricing/{access_token}"
         client.chat_postMessage(
             channel=channel_id,
             text=(
-                "*Sorry, seems you don't have enough credits. "
-                "Please refill the <{payment_url}|tank> and try again.*"
+                f"*Sorry, seems you don't have enough credits. "
+                f"Please refill the <{payment_url}|tank> and try again.*"
             )
         )
         return
