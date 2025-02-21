@@ -133,7 +133,7 @@ def handle_modal_submission(ack, body, client):
             channel=channel_id,
             text=(
                 "*Sorry, seems you don't have enough credits. "
-                "Please refill the tank and try again.*"
+                "Please refill the <{payment_url}|tank> and try again.*"
             )
         )
         return
