@@ -7,7 +7,7 @@ from database import (
     update_client_current_tasks,
     get_access_token
 )
-from asana_utils import create_asana_task, register_webhook_for_task
+from asana_utils import create_asana_task, register_webhook_for_task, create_asana_subtask
 from config import SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET, BACKEND_BASEURL
 
 app = App(token=SLACK_BOT_TOKEN, signing_secret=SLACK_SIGNING_SECRET)
