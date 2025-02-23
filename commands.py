@@ -140,6 +140,7 @@ def handle_modal_submission(ack, body, client):
         )
         return
 
+    # This is the detailed order info that will go inside the subtask.
     task_notes = f"""ORDER INFORMATION
 Packages amount: {thumbnail_packages}
 Resizes: {client_info.get('resize', 'None')}.
@@ -158,12 +159,25 @@ Video Link: {video_link}
 Additional Info: {additional_info}
 """
 
-    task_name = f"Request from {client_info.get('client_name_short', 'Unknown')}"
-    task_id = create_asana_task(task_name, task_notes)
+    # This is the simple description for the main task (like four empty rooms)
+    main_task_description = (
+        "1.\nThumbnail:\nTitle:\nDescription:\n\n"
+        "2.\nThumbnail:\nTitle:\nDescription:\n\n"
+        "3.\nThumbnail:\nTitle:\nDescription:\n\n"
+        "4.\nThumbnail:\nTitle:\nDescription:"
+    )
 
-    if task_id:
-        update_client_current_tasks(channel_id, task_id)
-        register_webhook_for_task(task_id)
+    task_name = f"Request from {client_info.get('client_name_short', 'Unknown')}"
+    # Create the main task in Asana using the simple description
+    main_task_id = create_asana_task(task_name, main_task_description)
+
+    if main_task_id:
+        # Now create a subtask inside the main task using the detailed order info.
+        subtask_name = "Order Details"
+        subtask_id = create_asana_subtask(main_task_id, subtask_name, task_notes)
+        
+        update_client_current_tasks(channel_id, main_task_id)
+        register_webhook_for_task(main_task_id)
         update_client_credits(channel_id, current_credits - required_credits)
         client.chat_postMessage(
             channel=channel_id,
