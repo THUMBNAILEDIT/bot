@@ -164,7 +164,7 @@ Additional Info: {additional_info}
         "1.\nThumbnail:\nTitle:\nDescription:\n\n"
         "2.\nThumbnail:\nTitle:\nDescription:\n\n"
         "3.\nThumbnail:\nTitle:\nDescription:\n\n"
-        "4.\nThumbnail:\nTitle:\nDescription:"
+        "4.\nThumbnail:\nTitle:\nDescription:\n\n"
         "Links for converting images - https://uk.imgbb.com/"
     )
 
