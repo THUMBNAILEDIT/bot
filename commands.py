@@ -165,6 +165,7 @@ Additional Info: {additional_info}
         "2.\nThumbnail:\nTitle:\nDescription:\n\n"
         "3.\nThumbnail:\nTitle:\nDescription:\n\n"
         "4.\nThumbnail:\nTitle:\nDescription:"
+        "Links for converting images - https://uk.imgbb.com/"
     )
 
     task_name = f"Request from {client_info.get('client_name_short', 'Unknown')}"
