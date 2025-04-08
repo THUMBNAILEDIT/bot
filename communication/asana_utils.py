@@ -1,8 +1,13 @@
+import logging
 import requests
-from config import ASANA_ACCESS_TOKEN, ASANA_PROJECT_ID, ASANA_ARCHIVE_PROJECT_ID, ASANA_WEBHOOK_URL
+from config.config import ASANA_ACCESS_TOKEN, ASANA_PROJECT_ID, ASANA_ARCHIVE_PROJECT_ID, ASANA_WEBHOOK_URL
+
+# ========================================================
 
 if not ASANA_WEBHOOK_URL:
     raise ValueError("ASANA_WEBHOOK_URL environment variable is not set!")
+
+# ========================================================
 
 def register_webhook_for_task(task_id):
     url = "https://app.asana.com/api/1.0/webhooks"
@@ -18,11 +23,13 @@ def register_webhook_for_task(task_id):
     }
     requests.post(url, headers=headers, json=data)
 
+# ========================================================
+
 def create_asana_task(task_name, task_notes):
     url = "https://app.asana.com/api/1.0/tasks"
     headers = {
         "Authorization": f"Bearer {ASANA_ACCESS_TOKEN}"
-    }
+    }  
     data = {
         "data": {
             "name": task_name,
@@ -36,19 +43,20 @@ def create_asana_task(task_name, task_notes):
         task_id = response.json().get("data", {}).get("gid")
         return task_id
     else:
-        print(f"Failed to create task: {response.text}")
+        logging.error(f"Failed to create task: {response.text}")
         return None
+
+# ========================================================
 
 def move_task_to_archive(task_id):
     if not ASANA_ARCHIVE_PROJECT_ID:
-        print("Error: Archive project ID is missing.")
+        logging.error("Error: Archive project ID is missing.")
         return
-        
+    
     url = f"https://app.asana.com/api/1.0/tasks/{task_id}/projects"
     headers = {
         "Authorization": f"Bearer {ASANA_ACCESS_TOKEN}"
     }
-    
     response = requests.get(url, headers=headers)
     
     if response.status_code == 200:
@@ -73,35 +81,30 @@ def move_task_to_archive(task_id):
         add_response = requests.post(add_url, headers=headers, json=data)
         
         if add_response.status_code != 200:
-            print(f"Failed to move task {task_id} to archive: {add_response.text}")
+            logging.error(f"Failed to move task {task_id} to archive: {add_response.text}")
         elif response.status_code != 200:
-            print(f"Failed to fetch current projects for task {task_id}: {response.text}")
+            logging.error(f"Failed to fetch current projects for task {task_id}: {response.text}")
 
-def create_asana_subtask(parent_task_id, subtask_name, subtask_notes):
-    """
-    Creates a subtask under the given parent task ID in Asana.
-    parent_task_id: The main task's ID (string).
-    subtask_name: The name/title of the subtask (string).
-    subtask_notes: The description or notes for the subtask (string).
-    Returns: The ID of the newly created subtask, or None if creation failed.
-    """
-    url = f"https://app.asana.com/api/1.0/tasks/{parent_task_id}/subtasks"
+# ========================================================
+
+def post_comment_to_task(task_id, comment_text):
+    url = f"https://app.asana.com/api/1.0/tasks/{task_id}/stories"
+    
     headers = {
-        "Authorization": f"Bearer {ASANA_ACCESS_TOKEN}"
+        "Authorization": f"Bearer {ASANA_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
     }
     data = {
         "data": {
-            "name": subtask_name,
-            "notes": subtask_notes
-            # You can also add "projects": [ASANA_PROJECT_ID] if you want the subtask to appear in a project.
+            "text": comment_text
         }
     }
 
-    response = requests.post(url, headers=headers, json=data)
+    response = requests.post(url, json=data, headers=headers)
 
     if response.status_code == 201:
-        subtask_id = response.json().get("data", {}).get("gid")
-        return subtask_id
+        # logging.info(f"Comment successfully posted to task {task_id}")
+        return True
     else:
-        print(f"Failed to create subtask: {response.text}")
-        return None
+        logging.error(f"Failed to post comment to task {task_id}: {response.text}")
+        return False
