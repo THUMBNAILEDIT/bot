@@ -46,7 +46,7 @@ def get_video_context(video_script, additional_info):
 
 def create_video_description (video_script, additional_info):
     prompt = (
-        "Analyze the following information and create an moderately-sized engaging description for a YouTube video based on it.\n\n"
+        "Analyze the following information and create a short and engaging, 1-2 sentence long description for a YouTube video based on it. Start it by saying 'In today's video ...'.\n\n"
         "Video Script:\n" + video_script + "\n\n"
         "Additional Information:\n" + additional_info + "\n\n"
         "Summary:"
