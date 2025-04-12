@@ -8,3 +8,4 @@ ecdsa~=0.19.0
 pytz~=2025.1
 openai
 replicate
+flask-cors
